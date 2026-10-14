@@ -37,16 +37,16 @@ export default async function Authorize({ searchParams }: { searchParams: Promis
       <h1>Autorizar acesso</h1>
       <p><strong>{req.clientName}</strong> (devolve para <code>{host}</code>) quer aceder à tua conta <strong>{user.email}</strong>.</p>
       <p>Sem escolher dispositivos, o acesso fica negado. Podes revogar a qualquer momento em <em>Clientes ligados</em>.</p>
-      {first(sp.form_error) && <p role="alert" style={{ color: "crimson" }}>Escolhe pelo menos um dispositivo e indica diretórios absolutos permitidos.</p>}
+      {first(sp.form_error) && <p role="alert" className="alert">Escolhe pelo menos um dispositivo e indica diretórios absolutos permitidos.</p>}
       {devices.length === 0 ? (
         <p>Não tens dispositivos emparelhados. <a href="/device">Emparelha um</a> e volta a tentar.</p>
       ) : (
-        <form action={decideConsent} style={{ display: "grid", gap: 12 }}>
+        <form action={decideConsent} className="stack">
           {KEYS.map((k) => first(sp[k]) !== null && <input key={k} type="hidden" name={k} value={first(sp[k])!} />)}
           <fieldset>
             <legend>Dispositivos</legend>
             {devices.map((d) => (
-              <label key={d.id} style={{ display: "block" }}>
+              <label key={d.id}>
                 <input type="checkbox" name="devices" value={d.id} /> {d.name} <small>({d.os ?? "?"})</small>
               </label>
             ))}
@@ -65,11 +65,13 @@ export default async function Authorize({ searchParams }: { searchParams: Promis
             </select>
           </label>
           <label>Diretórios permitidos (um por linha)
-            <textarea name="dirs" rows={3} required style={{ width: "100%" }} placeholder="/home/user/projeto" />
+            <textarea name="dirs" rows={3} required placeholder="/home/user/projeto" />
           </label>
           <div>
-            <button name="decision" value="approve">Autorizar</button>{" "}
+            <div className="row">
+            <button name="decision" value="approve" className="primary">Autorizar</button>
             <button name="decision" value="deny" formNoValidate>Negar</button>
+          </div>
           </div>
         </form>
       )}

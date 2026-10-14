@@ -5,6 +5,7 @@ import { adminRevoke, deleteUser, revokeAllForUser, setLimits, setRole } from "@
 import { db, schema } from "@/lib/db";
 import { requireAdmin } from "@/lib/guard";
 import { PanelForm } from "../../../panel-form";
+import { ConfirmButton } from "@/components/confirm-button";
 
 const when = (d: Date | null) => (d ? d.toISOString().slice(0, 16).replace("T", " ") : "—");
 
@@ -22,14 +23,14 @@ export default async function AdminUser({ params }: { params: Promise<{ id: stri
   ]);
   const devName = new Map(devices.map((d) => [d.id, d.name]));
   const revoke = (kind: string, rid: string, label = "Revogar") => (
-    <form action={adminRevoke} style={{ display: "inline" }}>
+    <form action={adminRevoke} className="inline">
       <input type="hidden" name="kind" value={kind} /><input type="hidden" name="id" value={rid} />
-      <input type="hidden" name="userId" value={id} /><button>{label}</button>
+      <input type="hidden" name="userId" value={id} /><ConfirmButton message="Revogar?">{label}</ConfirmButton>
     </form>
   );
 
   return (
-    <main style={{ maxWidth: 900 }}>
+    <main>
       <h1>{u.email}</h1>
       <p>{u.name} · papel <strong>{u.role}</strong> · estado <strong>{u.status}</strong> · criado {when(u.createdAt)}</p>
 
@@ -55,7 +56,7 @@ export default async function AdminUser({ params }: { params: Promise<{ id: stri
         <fieldset>
           <legend>Tools proibidas</legend>
           {ALL_TOOLS.map((t) => (
-            <label key={t} style={{ display: "inline-block", marginRight: 12 }}>
+            <label key={t}>
               <input type="checkbox" name="disabled" value={t} defaultChecked={u.disabledTools.includes(t)} /> <code>{t}</code>
             </label>
           ))}
@@ -70,12 +71,12 @@ export default async function AdminUser({ params }: { params: Promise<{ id: stri
       <ul>{tokens.map((t) => <li key={t.id}>{t.name ?? t.kind} ({t.kind}) último uso {when(t.lastUsedAt)} {revoke("token", t.id)}</li>)}</ul>
 
       <h2>Ações</h2>
-      <form action={revokeAllForUser} style={{ display: "inline" }}>
-        <input type="hidden" name="userId" value={u.id} /><button>Revogar tudo (grants e tokens)</button>
+      <form action={revokeAllForUser} className="inline">
+        <input type="hidden" name="userId" value={u.id} /><ConfirmButton message="Revogar todos os acessos e tokens deste utilizador?">Revogar tudo</ConfirmButton>
       </form>{" "}
       {u.id !== me.id && u.role !== "admin" && (
-        <form action={deleteUser} style={{ display: "inline" }}>
-          <input type="hidden" name="userId" value={u.id} /><button>Apagar utilizador</button>
+        <form action={deleteUser} className="inline">
+          <input type="hidden" name="userId" value={u.id} /><ConfirmButton message="Apagar este utilizador e todos os seus dados? Não é reversível.">Apagar utilizador</ConfirmButton>
         </form>
       )}
       <p><a href="/admin">Voltar</a></p>

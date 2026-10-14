@@ -1,10 +1,9 @@
 import { requireUser } from "@/lib/guard";
+import { CodeBlock } from "@/components/code-block";
 import { canonicalResource } from "@/lib/oauth";
 import { appUrl } from "@/lib/app-url";
 
-const Code = ({ children }: { children: string }) => (
-  <pre style={{ background: "#f4f4f4", padding: 10, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{children}</pre>
-);
+const Code = ({ children }: { children: string }) => <CodeBlock>{children}</CodeBlock>;
 
 /** Formatos verificados na documentação de cada cliente em 2026-10-14 (ver README: testado vs esperado). */
 export default async function Connect() {
@@ -13,7 +12,7 @@ export default async function Connect() {
   const url = canonicalResource(base);
   const PAT = "<O_TEU_TOKEN_mpat_…>";
   return (
-    <main style={{ maxWidth: 860 }}>
+    <main>
       <h1>Ligar clientes MCP</h1>
       <p>Endpoint: <code>{url}</code> (Streamable HTTP). Dois modos de autenticação:</p>
       <ul>
@@ -78,7 +77,6 @@ curl -s ${url} \\
         <li>As restrições de diretórios/comandos são guardrails, <strong>não uma sandbox</strong>. Para risco alto corre o relay num container ou VM.</li>
         <li>Quem controla a tua conta no painel ou o cliente autorizado controla as máquinas concedidas: ativa o <a href="/security">2FA</a>.</li>
       </ul>
-      <p><a href="/dashboard">Voltar</a></p>
-    </main>
+          </main>
   );
 }

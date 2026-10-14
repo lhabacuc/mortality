@@ -10,10 +10,10 @@ export function Form({ action, children, submit }: {
 }) {
   const [state, run, pending] = useActionState(action, undefined);
   return (
-    <form action={run} style={{ display: "grid", gap: 12 }}>
+    <form action={run} className="stack">
       {children}
-      {state?.error && <p role="alert" style={{ color: "crimson", margin: 0 }}>{state.error}</p>}
-      <button disabled={pending}>{pending ? "…" : submit}</button>
+      {state?.error && <p role="alert" className="alert">{state.error}</p>}
+      <div><button className="primary" disabled={pending}>{pending ? "A processar…" : submit}</button></div>
     </form>
   );
 }

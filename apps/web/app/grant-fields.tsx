@@ -26,16 +26,16 @@ export function GrantFields({ d = {}, keepDuration }: { d?: GrantDefaults; keepD
         </select>
       </label>
       <label>Diretórios permitidos (um por linha)
-        <textarea name="dirs" rows={3} defaultValue={(d.dirs ?? []).join("\n")} required style={{ width: "100%" }} />
+        <textarea name="dirs" rows={3} defaultValue={(d.dirs ?? []).join("\n")} required />
       </label>
       <label>Comandos bloqueados (um por linha; guardrail, não sandbox)
-        <textarea name="blocked" rows={2} defaultValue={(d.blocked ?? []).join("\n")} style={{ width: "100%" }} />
+        <textarea name="blocked" rows={2} defaultValue={(d.blocked ?? []).join("\n")} />
       </label>
       <label><input type="checkbox" name="readOnly" defaultChecked={d.readOnly} /> Forçar só leitura</label>
       <fieldset>
         <legend>Exigir aprovação humana no painel para</legend>
         {APPROVAL_TOOLS.map((t) => (
-          <label key={t} style={{ display: "inline-block", marginRight: 12 }}>
+          <label key={t}>
             <input type="checkbox" name="approve" value={t} defaultChecked={d.approve?.includes(t)} /> <code>{t}</code>
           </label>
         ))}
@@ -43,7 +43,7 @@ export function GrantFields({ d = {}, keepDuration }: { d?: GrantDefaults; keepD
       <details>
         <summary>Tools (só usadas no preset Personalizado)</summary>
         {ALL_TOOLS.map((t) => (
-          <label key={t} style={{ display: "block" }}>
+          <label key={t}>
             <input type="checkbox" name="tools" value={t} defaultChecked={d.tools?.includes(t)} /> {t}
           </label>
         ))}

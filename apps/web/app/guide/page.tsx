@@ -1,14 +1,15 @@
 import { appUrl } from "@/lib/app-url";
+import { CodeBlock } from "@/components/code-block";
 import { canonicalResource } from "@/lib/oauth";
 
-const Code = ({ children }: { children: string }) => (
-  <pre style={{ background: "#f4f4f4", padding: 10, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{children}</pre>
-);
+const Code = ({ children }: { children: string }) => <CodeBlock>{children}</CodeBlock>;
 const Table = ({ head, rows }: { head: string[]; rows: string[][] }) => (
-  <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 14, margin: "8px 0" }}>
-    <thead><tr>{head.map((h) => <th key={h} align="left" style={{ borderBottom: "1px solid #888", padding: 6 }}>{h}</th>)}</tr></thead>
-    <tbody>{rows.map((r) => <tr key={r[0]}>{r.map((c, i) => <td key={i} style={{ borderBottom: "1px solid #ddd", padding: 6, verticalAlign: "top" }}>{c}</td>)}</tr>)}</tbody>
-  </table>
+  <div className="table-wrap">
+    <table>
+      <thead><tr>{head.map((h) => <th key={h}>{h}</th>)}</tr></thead>
+      <tbody>{rows.map((r) => <tr key={r[0]}>{r.map((c, i) => <td key={i}>{c}</td>)}</tr>)}</tbody>
+    </table>
+  </div>
 );
 
 /** Guia público (sem segredos): explica o modelo, a instalação e a resolução de problemas. */
@@ -16,7 +17,7 @@ export default function Guide() {
   const base = appUrl();
   const mcp = canonicalResource(base);
   return (
-    <main style={{ maxWidth: 860 }}>
+    <main>
       <h1>Guia do Mortality</h1>
       <p>
         O Mortality deixa clientes de IA (ChatGPT, Claude, Gemini, Cursor, VS Code…) usar as <em>tuas</em> máquinas

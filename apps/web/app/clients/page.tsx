@@ -3,12 +3,13 @@ import { db, schema } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
 import { addGrant, disconnectAll, revokeGrant, revokeOAuthClient, updateGrant } from "@/lib/access-actions";
 import { PanelForm } from "../panel-form";
+import { ago, until } from "@/lib/format";
 import { GrantFields } from "../grant-fields";
+import { ConfirmButton } from "@/components/confirm-button";
 
 const PRESET: Record<string, string> = {
   read_only: "Só leitura", read_write: "Leitura e escrita", terminal: "Terminal", custom: "Personalizado",
 };
-const when = (d: Date | null, none = "—") => (d ? d.toISOString().slice(0, 16).replace("T", " ") : none);
 
 export default async function Clients() {
   const user = await requireUser();
@@ -32,7 +33,7 @@ export default async function Clients() {
   const entries = [
     ...tokens.filter((t) => t.kind === "pat").map((t) => ({
       key: t.id, title: t.name ?? "(sem nome)", kind: "pat", last: t.lastUsedAt,
-      note: t.expiresAt ? `expira ${when(t.expiresAt)}` : "sem expiração",
+      note: until(t.expiresAt),
     })),
     ...oauthIds.map((id) => ({
       key: id, title: oauthNames.find((n) => n.id === id)?.name ?? id, kind: "oauth",
@@ -46,28 +47,28 @@ export default async function Clients() {
   return (
     <main>
       <h1>Clientes ligados</h1>
-      <p>Cada cliente só acede aos dispositivos para os quais tem um grant ativo. Sem grant, o acesso é negado.</p>
-      <form action={disconnectAll}><button>Desconectar tudo</button></form>
+      <p className="muted">Cada cliente só acede aos dispositivos para os quais tem um acesso ativo. Sem acesso, é negado.</p>
+      <form action={disconnectAll} className="row"><ConfirmButton message="Revogar TODOS os acessos e tokens? Os clientes deixam de funcionar de imediato.">Desconectar tudo</ConfirmButton></form>
 
-      {entries.length === 0 && <p>Nenhum cliente. Cria um token em <a href="/tokens">Tokens</a>.</p>}
+      {entries.length === 0 && <div className="empty"><strong>Nenhum cliente com acesso.</strong> Liga um em <a href="/connect">Ligar</a> ou cria um <a href="/tokens">token</a>.</div>}
       {entries.map((t) => {
         const own = grants.filter((g) => g.clientId === t.key);
         const free = devices.filter((d) => !own.some((g) => g.deviceId === d.id));
         return (
-          <section key={t.key} style={{ border: "1px solid #888", padding: 12, margin: "16px 0" }}>
-            <h2 style={{ marginTop: 0 }}>{t.title} <small>({t.kind})</small></h2>
-            <p>Último uso: {when(t.last, "nunca")} · {t.note}</p>
+          <section key={t.key} className="panel">
+            <h2>{t.title} <small>{t.kind === "oauth" ? "OAuth" : "token"}</small></h2>
+            <p className="muted">Último uso: {ago(t.last)} · {t.note}</p>
             {t.kind === "oauth" && (
-              <form action={revokeOAuthClient}><input type="hidden" name="clientId" value={t.key} /><button>Revogar cliente (tokens e acessos)</button></form>
+              <form action={revokeOAuthClient}><input type="hidden" name="clientId" value={t.key} /><ConfirmButton message="Revogar este cliente (tokens e acessos)?">Revogar cliente</ConfirmButton></form>
             )}
             {own.length === 0 && <p><em>Sem acesso a nenhum dispositivo.</em></p>}
             {own.map((g) => {
               const expired = g.expiresAt && g.expiresAt.getTime() < now;
               return (
-                <details key={g.id} style={{ margin: "8px 0" }}>
+                <details key={g.id}>
                   <summary>
                     <strong>{devName.get(g.deviceId) ?? "?"}</strong> — {PRESET[g.preset]}
-                    {g.readOnly && " · só leitura"} · {g.expiresAt ? `${expired ? "EXPIRADO " : "expira "}${when(g.expiresAt)}` : "sem expiração"}
+                    {g.readOnly && " · só leitura"} · <span className={expired ? "alert" : "muted"}>{until(g.expiresAt)}</span>
                   </summary>
                   <PanelForm action={updateGrant} submit="Guardar alterações">
                     <input type="hidden" name="grantId" value={g.id} />
@@ -77,7 +78,7 @@ export default async function Clients() {
                     }} />
                   </PanelForm>
                   <form action={revokeGrant}>
-                    <input type="hidden" name="grantId" value={g.id} /><button>Revogar este acesso</button>
+                    <input type="hidden" name="grantId" value={g.id} /><ConfirmButton message="Revogar este acesso? O cliente perde o acesso de imediato.">Revogar este acesso</ConfirmButton>
                   </form>
                 </details>
               );
@@ -95,7 +96,6 @@ export default async function Clients() {
           </section>
         );
       })}
-      <p><a href="/dashboard">Voltar</a></p>
-    </main>
+          </main>
   );
 }

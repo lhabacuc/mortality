@@ -2,8 +2,9 @@
 
 import { useActionState, type ReactNode } from "react";
 import type { PanelState } from "@/lib/panel-actions";
+import { CopyButton } from "@/components/copy-button";
 
-export function PanelForm({ action, children, submit, tokenLabel = "Token (mostrado uma única vez)" }: {
+export function PanelForm({ action, children, submit, tokenLabel = "Mostrado uma única vez — guarda agora" }: {
   action: (s: PanelState, f: FormData) => Promise<PanelState>;
   children: ReactNode;
   submit: string;
@@ -11,16 +12,20 @@ export function PanelForm({ action, children, submit, tokenLabel = "Token (mostr
 }) {
   const [state, run, pending] = useActionState(action, undefined);
   return (
-    <form action={run} style={{ display: "grid", gap: 12 }}>
+    <form action={run} className="stack">
       {children}
-      {state?.error && <p role="alert" style={{ color: "crimson", margin: 0 }}>{state.error}</p>}
+      {state?.error && <p role="alert" className="alert">{state.error}</p>}
+      {state?.ok && <p role="status" className="success">{state.ok}</p>}
       {state?.token && (
-        <div style={{ border: "1px solid #888", padding: 12 }}>
-          <strong>{tokenLabel}:</strong>
-          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{state.token}</pre>
+        <div className="token">
+          <p>{tokenLabel}</p>
+          <div className="codeblock">
+            <pre>{state.token}</pre>
+            <CopyButton text={state.token} />
+          </div>
         </div>
       )}
-      <button disabled={pending}>{pending ? "…" : submit}</button>
+      <div><button className="primary" disabled={pending}>{pending ? "A processar…" : submit}</button></div>
     </form>
   );
 }

@@ -8,9 +8,9 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   const rows = await queryAudit(f);
   const qs = new URLSearchParams(Object.entries(sp).filter(([, v]) => v) as [string, string][]).toString();
   return (
-    <main style={{ maxWidth: 1100 }}>
+    <main>
       <h1>Audit global</h1>
-      <form method="get" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <form method="get" className="row">
         <input name="email" placeholder="email" defaultValue={sp.email} />
         <input name="action" placeholder="ação (prefixo)" defaultValue={sp.action} />
         <input name="tool" placeholder="tool" defaultValue={sp.tool} />
@@ -20,7 +20,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
         <button>Filtrar</button>
         <a href={`/admin/audit/export?${qs}`}>Exportar CSV</a>
       </form>
-      <table width="100%" style={{ fontSize: 13, marginTop: 12 }}>
+      <div className="table-wrap"><table>
         <thead><tr><th align="left">Quando</th><th align="left">Utilizador</th><th align="left">Ator</th><th align="left">Ação</th><th align="left">Tool</th><th align="left">Dispositivo</th><th>OK</th><th align="left">IP</th></tr></thead>
         <tbody>
           {rows.map(({ a, email, device }) => (
@@ -31,7 +31,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       <p><a href="/admin">Voltar</a></p>
     </main>
   );

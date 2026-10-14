@@ -3,6 +3,8 @@ import { db, schema } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
 import { createPat, revokePat } from "@/lib/panel-actions";
 import { PanelForm } from "../panel-form";
+import { ConfirmButton } from "@/components/confirm-button";
+import { ago, until } from "@/lib/format";
 
 export default async function Tokens() {
   const user = await requireUser();
@@ -13,11 +15,11 @@ export default async function Tokens() {
     .orderBy(desc(schema.accessTokens.createdAt));
   return (
     <main>
-      <h1>Tokens de acesso (PAT)</h1>
-      <p>Cada token nasce sem acesso; aqui defines já o dispositivo, o preset e os diretórios permitidos.</p>
-      {devices.length === 0 ? <p>Emparelha primeiro um dispositivo.</p> : (
+      <h1>Tokens</h1>
+      <p className="muted">Para clientes sem OAuth. Cada token nasce sem acesso: defines já o dispositivo, as permissões e os diretórios.</p>
+      {devices.length === 0 ? <div className="empty"><strong>Falta um dispositivo.</strong> <a href="/devices">Adiciona um</a> antes de criar tokens.</div> : (
         <PanelForm action={createPat} submit="Criar token">
-          <input name="name" placeholder="Nome (ex.: Claude Code)" required maxLength={60} />
+          <input name="name" aria-label="Nome do token" placeholder="Nome (ex.: Claude Code)" required maxLength={60} />
           <select name="deviceId" required>{devices.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
           <select name="preset" defaultValue="read_only">
             <option value="read_only">Só leitura</option>
@@ -32,17 +34,28 @@ export default async function Tokens() {
         </PanelForm>
       )}
       <h2>Ativos</h2>
-      <ul>
-        {pats.map((t) => (
-          <li key={t.id}>
-            {t.name} — {t.expiresAt ? `expira ${t.expiresAt.toISOString().slice(0, 16)}` : "sem expiração"}{" "}
-            <form action={revokePat} style={{ display: "inline" }}>
-              <input type="hidden" name="id" value={t.id} /><button>Revogar</button>
-            </form>
-          </li>
-        ))}
-      </ul>
-      <p><a href="/dashboard">Voltar</a></p>
+      {pats.length === 0 ? <p className="muted">Nenhum token ativo.</p> : (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Nome</th><th>Último uso</th><th>Validade</th><th /></tr></thead>
+            <tbody>
+              {pats.map((t) => (
+                <tr key={t.id}>
+                  <td><strong>{t.name}</strong></td>
+                  <td className="muted">{ago(t.lastUsedAt)}</td>
+                  <td className="muted">{until(t.expiresAt)}</td>
+                  <td className="act">
+                    <form action={revokePat} className="inline">
+                      <input type="hidden" name="id" value={t.id} />
+                      <ConfirmButton message={`Revogar o token "${t.name}"?`}>Revogar</ConfirmButton>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </main>
   );
 }

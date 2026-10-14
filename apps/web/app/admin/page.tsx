@@ -17,28 +17,27 @@ export default async function Admin() {
   const users = await db().select().from(schema.users).orderBy(desc(schema.users.createdAt));
   return (
     <main>
-      <h1>Utilizadores</h1>
+      <h1>Administração</h1>
       <p><a href="/admin/invites">Convites</a> · <a href="/admin/audit">Audit global</a></p>
-      <table width="100%">
-        <thead><tr><th align="left">Email</th><th>Papel</th><th>Estado</th><th /></tr></thead>
+      <div className="table-wrap"><table>
+        <thead><tr><th>Email</th><th>Papel</th><th>Estado</th><th /></tr></thead>
         <tbody>
           {users.map((u) => (
             <tr key={u.id}>
-              <td><a href={`/admin/users/${u.id}`}>{u.email}</a></td><td align="center">{u.role}</td><td align="center">{u.status}</td>
+              <td><a href={`/admin/users/${u.id}`}>{u.email}</a></td><td className="muted">{u.role}</td><td><span className={`dot ${u.status === "active" ? "ok" : u.status === "pending" ? "warn" : "bad"}`} />{u.status}</td>
               <td>
                 {u.role !== "admin" && OPS[u.status]?.map(([op, label]) => (
-                  <form key={op} action={adminUserAction} style={{ display: "inline" }}>
+                  <form key={op} action={adminUserAction} className="inline">
                     <input type="hidden" name="userId" value={u.id} />
                     <input type="hidden" name="op" value={op} />
-                    <button>{label}</button>
+                    <button className={op === "approve" ? "primary sm" : "sm"}>{label}</button>
                   </form>
                 ))}
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
-      <p><a href="/dashboard">Voltar</a></p>
-    </main>
+      </table></div>
+          </main>
   );
 }

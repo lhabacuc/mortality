@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { logout } from "@/lib/actions";
 
 const TABS: [string, string][] = [
   ["/dashboard", "Início"],
   ["/devices", "Dispositivos"],
-  ["/tokens", "Tokens"],
   ["/clients", "Clientes"],
+  ["/tokens", "Tokens"],
   ["/approvals", "Aprovações"],
   ["/activity", "Atividade"],
   ["/connect", "Ligar"],
@@ -15,21 +16,30 @@ const TABS: [string, string][] = [
   ["/security", "Segurança"],
 ];
 
-/** Barra de abas; só aparece com sessão. O estado ativo vem do caminho atual. */
+const AUTH_ROUTES = ["/login", "/signup", "/change-password", "/oauth/authorize"];
+
 export function Nav() {
   const path = usePathname();
+  // Nas páginas de autenticação só se mostra a marca (um cookie antigo não deve fingir sessão).
+  if (AUTH_ROUTES.some((r) => path === r || path.startsWith(r + "/"))) {
+    return (
+      <header className="topbar">
+        <Link href="/" className="brand">mortality</Link>
+        <nav className="tabs" aria-label="Principal"><Link href="/guide">Guia</Link></nav>
+      </header>
+    );
+  }
   return (
-    <nav aria-label="Principal" style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid #ccc", marginBottom: 20 }}>
-      {TABS.map(([href, label]) => {
-        const active = path === href || path.startsWith(href + "/");
-        return (
-          <Link key={href} href={href} aria-current={active ? "page" : undefined}
-            style={{ padding: "8px 10px", textDecoration: "none", color: active ? "#000" : "#06c", fontWeight: active ? 700 : 400,
-              borderBottom: active ? "3px solid #06c" : "3px solid transparent" }}>
+    <header className="topbar">
+      <Link href="/dashboard" className="brand">mortality</Link>
+      <nav className="tabs" aria-label="Principal">
+        {TABS.map(([href, label]) => (
+          <Link key={href} href={href} aria-current={path === href || path.startsWith(href + "/") ? "page" : undefined}>
             {label}
           </Link>
-        );
-      })}
-    </nav>
+        ))}
+      </nav>
+      <form action={logout}><button className="linklike">Sair</button></form>
+    </header>
   );
 }
