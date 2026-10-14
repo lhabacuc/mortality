@@ -84,7 +84,7 @@ export default function Guide() {
         <li><strong>ChatGPT:</strong> Settings → Connectors → Advanced → Developer mode → Create → URL acima → OAuth.</li>
         <li><strong>Claude.ai:</strong> <em>+</em> → Add custom connector → URL acima.</li>
         <li><strong>Claude Code:</strong> <code>claude mcp add --transport http mortality {mcp}</code></li>
-        <li><strong>Gemini web:</strong> pede Client ID e Secret; cria-os em <a href="/clients">Clientes → Registar cliente OAuth</a> (ver <a href="/connect">Ligar</a>).</li>
+        <li><strong>Gemini web:</strong> adiciona o URL com autenticação OAuth (regista-se sozinho). Só se pedir Client ID e Secret é que os crias em <a href="/clients">Clientes → Registar cliente OAuth</a>.</li>
         <li><strong>Sem OAuth:</strong> cria um <a href="/tokens">token</a> e envia-o em <code>Authorization: Bearer …</code>.</li>
       </ul>
       <p>No ecrã de consentimento escolhes <em>que dispositivos</em>, <em>que permissões</em> e <em>por quanto tempo</em>. Sem dispositivo escolhido, o cliente não fica com acesso.</p>
@@ -94,7 +94,7 @@ export default function Guide() {
         ["Só leitura", "listar, ler, pesquisar, informação do sistema", "Começar aqui. Mais seguro."],
         ["Leitura e escrita", "+ escrever, editar, criar pastas, mover", "Tarefas que alteram ficheiros."],
         ["Terminal", "+ iniciar e controlar processos", "Só com aprovação humana e duração curta."],
-        ["sudo-for-all", "todas as ferramentas e o terminal, sem pedir permissão", "Acesso total. Exige confirmação, dura no máximo 24 h e o admin tem de o permitir."],
+        ["sudo-for-all", "todas as ferramentas e o terminal, sem pedir permissão", "Acesso total. Exige confirmação explícita e dura no máximo 24 h."],
         ["Personalizado", "tools à escolha", "Casos específicos."],
       ]} />
       <ul>
@@ -104,7 +104,8 @@ export default function Guide() {
         <li><strong>Comandos bloqueados:</strong> lista de comandos recusados no terminal (guardrail, não sandbox).</li>
         <li><strong>Duração:</strong> 1 h, 24 h, 30 dias ou até revogar. Prefere curtas.</li>
         <li><strong>Política local:</strong> o ficheiro <code>~/.config/mortality/policy.json</code> só pode <em>restringir</em>; o servidor nunca o alarga.</li>
-        <li><strong>Teto do administrador:</strong> o admin pode limitar o preset máximo e as tools da tua conta.</li>
+        <li><strong>Teto do administrador:</strong> opcional. Por defeito qualquer utilizador pode escolher qualquer nível; o admin pode limitar o preset máximo e as tools de uma conta.</li>
+        <li><strong>Alterações aplicam-se de imediato:</strong> mudar permissões no painel vale logo para o cliente, sem reconectar. O cliente vê sempre a lista completa de ferramentas e a permissão é decidida em cada chamada; <code>whoami</code> mostra o estado atual.</li>
       </ul>
 
       <h2>6. Aprovações humanas</h2>

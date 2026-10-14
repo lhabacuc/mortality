@@ -1,5 +1,6 @@
 import { and, eq, isNull, or, gt } from "drizzle-orm";
 import { MIN_RELAY_BLOCKED_DIRS, ONLINE_THRESHOLD_MS, ceilingTools, versionAtLeast, toolsForPreset, type EffectivePermissions, type Preset } from "@mortality/shared";
+import { appUrl } from "./app-url";
 import { db, schema } from "./db";
 import { bearer, sha256 } from "./tokens";
 
@@ -38,6 +39,7 @@ export async function authenticateMcp(req: Request, resource?: string): Promise<
 
 export interface ActiveGrant {
   grantId: string;
+  preset: Preset;
   device: typeof schema.devices.$inferSelect;
   tools: string[];
   permissions: EffectivePermissions;
@@ -68,7 +70,7 @@ export async function activeGrants(ctx: McpContext): Promise<ActiveGrant[]> {
     const raw = preset === "custom" ? g.allowedTools : toolsForPreset(preset);
     const tools = raw.filter((t) => cap.includes(t));
     return {
-      grantId: g.id, device: d, tools: g.readOnly ? tools.filter((t) => toolsForPreset("read_only").includes(t)) : tools,
+      grantId: g.id, preset, device: d, tools: g.readOnly ? tools.filter((t) => toolsForPreset("read_only").includes(t)) : tools,
       permissions: {
         allowedDirs: g.allowedDirs, blockedDirs: g.blockedDirs,
         // O teto do admin aplica-se também a grants já existentes.
@@ -83,8 +85,18 @@ export async function activeGrants(ctx: McpContext): Promise<ActiveGrant[]> {
 
 /** Escolhe o dispositivo pedido (ou o único possível) e valida tool + estado. */
 export function resolveDevice(grants: ActiveGrant[], tool: string, deviceArg?: string): ActiveGrant {
+  const panel = `${appUrl()}/clients`;
+  if (!grants.length) {
+    throw new AccessError(`Este cliente não tem acesso a nenhum dispositivo. O utilizador pode conceder acesso em ${panel}.`);
+  }
   const candidates = grants.filter((g) => g.tools.includes(tool));
-  if (!candidates.length) throw new AccessError(`Sem acesso à tool "${tool}".`);
+  if (!candidates.length) {
+    const have = [...new Set(grants.map((g) => g.preset))].join(", ");
+    throw new AccessError(
+      `A tool "${tool}" não está permitida com as permissões atuais (${have}). ` +
+      `O utilizador pode alterá-las em ${panel}; a mudança aplica-se de imediato, sem reconectar.`,
+    );
+  }
   let g: ActiveGrant | undefined;
   if (deviceArg) {
     g = candidates.find((c) => c.device.name === deviceArg || c.device.id === deviceArg);

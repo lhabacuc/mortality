@@ -1,17 +1,23 @@
 import { and, eq, isNull } from "drizzle-orm";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { checkCeiling } from "@mortality/shared";
-import { decideConsent } from "@/lib/oauth-actions";
-import { DirFields } from "../../dir-fields";
-import { SudoConfirm } from "../../grant-fields";
-import { db, schema } from "@/lib/db";
-import { currentUser } from "@/lib/session";
-import { validateAuthRequest, redirectWith } from "@/lib/oauth-request";
 import { appUrl } from "@/lib/app-url";
+import { db, schema } from "@/lib/db";
+import { redirectWith, validateAuthRequest } from "@/lib/oauth-request";
+import { currentUser } from "@/lib/session";
+import { ConsentForm, type PresetOption } from "./consent-form";
 
 type SP = Record<string, string | string[] | undefined>;
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
 const KEYS = ["client_id", "redirect_uri", "response_type", "code_challenge", "code_challenge_method", "state", "scope", "resource"];
+
+const PRESETS: PresetOption[] = [
+  { value: "read_only", label: "Só leitura", summary: "Listar, ler e pesquisar ficheiros e ver informação do sistema. Não altera nada." },
+  { value: "read_write", label: "Leitura e escrita", summary: "Tudo o anterior, mais escrever, editar, criar pastas e mover ficheiros." },
+  { value: "terminal", label: "Terminal", summary: "Tudo o anterior, mais executar comandos. Cada comando espera a tua aprovação no painel." },
+  { value: "sudo_for_all", label: "sudo-for-all", summary: "Todas as ferramentas e o terminal, sem pedir permissão." },
+];
 
 export default async function Authorize({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
@@ -32,55 +38,64 @@ export default async function Authorize({ searchParams }: { searchParams: Promis
 
   const devices = await db().select().from(schema.devices)
     .where(and(eq(schema.devices.userId, user.id), isNull(schema.devices.revokedAt)));
-  const host = new URL(req.redirectUri).host || new URL(req.redirectUri).protocol;
+  const url = new URL(req.redirectUri);
+  const host = url.host || url.protocol;
+
+  // Só oferece os presets que o teto do administrador permite.
+  const presets = PRESETS.filter((p) => !checkCeiling(user, { preset: p.value }));
+  const params: Record<string, string> = {};
+  for (const k of KEYS) { const v = first(sp[k]); if (v !== null) params[k] = v; }
+
+  const err = first(sp.form_error);
+  const deviceIds = new Set(devices.map((d) => d.id));
 
   return (
     <main>
-      <h1>Autorizar acesso</h1>
-      <p><strong>{req.clientName}</strong> (devolve para <code>{host}</code>) quer aceder à tua conta <strong>{user.email}</strong>.</p>
-      <p>Sem escolher dispositivos, o acesso fica negado. Podes revogar a qualquer momento em <em>Clientes ligados</em>.</p>
-      {first(sp.form_error) && <p role="alert" className="alert">Escolhe pelo menos um dispositivo e indica diretórios absolutos permitidos.</p>}
+      <h1>Autorizar {req.clientName}</h1>
+      <p>
+        Esta aplicação pede acesso às tuas máquinas através da conta <strong>{user.email}</strong>.
+        Depois da decisão volta para <code>{host}</code>.
+      </p>
+      <p className="muted">
+        Só autorizes se foste tu a iniciar esta ligação. Sem dispositivos escolhidos, o acesso fica negado, e podes
+        revogá-lo a qualquer momento em <Link href="/clients">Clientes</Link>.
+      </p>
+
       {devices.length === 0 ? (
-        <p>Não tens dispositivos emparelhados. <a href="/device">Emparelha um</a> e volta a tentar.</p>
+        <div className="empty">
+          <strong>Ainda não tens dispositivos.</strong> Num terminal do computador que queres ligar:
+          <pre>{`curl -fsSL ${base}/install | bash`}</pre>
+          Depois emparelha-o em <Link href="/device">Emparelhar dispositivo</Link> e volta a abrir esta ligação.
+        </div>
+      ) : presets.length === 0 ? (
+        <div className="empty">O administrador não permite nenhum nível de acesso para a tua conta.</div>
       ) : (
-        <form action={decideConsent} className="stack">
-          {KEYS.map((k) => first(sp[k]) !== null && <input key={k} type="hidden" name={k} value={first(sp[k])!} />)}
-          <fieldset>
-            <legend>Dispositivos</legend>
-            {devices.map((d) => (
-              <label key={d.id}>
-                <input type="checkbox" name="devices" value={d.id} /> {d.name} <small>({d.os ?? "?"})</small>
-              </label>
-            ))}
-          </fieldset>
-          <label>Permissões{" "}
-            <select name="preset" defaultValue="read_only">
-              {!checkCeiling(user, { preset: "read_only" }) && <option value="read_only">Só leitura (listar, ler, pesquisar, info)</option>}
-              {!checkCeiling(user, { preset: "read_write" }) && <option value="read_write">Leitura e escrita</option>}
-              {!checkCeiling(user, { preset: "terminal" }) && <option value="terminal">Terminal (cada processo exige a tua aprovação)</option>}
-              {!checkCeiling(user, { preset: "sudo_for_all" }) && <option value="sudo_for_all">sudo-for-all (acesso total, sem pedir permissão)</option>}
-            </select>
-          </label>
-          <label>Duração{" "}
-            <select name="duration" defaultValue="24h">
-              <option value="1h">1 hora</option><option value="24h">24 horas</option>
-              <option value="30d">30 dias</option><option value="never">Até revogar</option>
-            </select>
-          </label>
-          <DirFields allowAllOk={user.allowAllDirsOk} />
-          {!checkCeiling(user, { preset: "sudo_for_all" }) && <SudoConfirm />}
-          <div>
-            <div className="row">
-            <button name="decision" value="approve" className="primary">Autorizar</button>
-            <button name="decision" value="deny" formNoValidate>Negar</button>
-          </div>
-          </div>
-        </form>
+        <ConsentForm
+          params={params}
+          devices={devices.map((d) => ({ id: d.id, name: d.name, os: d.os }))}
+          presets={presets}
+          allowAllOk={user.allowAllDirsOk}
+          error={err ? err.slice(0, 240) : null}
+          defaults={{
+            preset: first(sp.preset) ?? "read_only",
+            duration: first(sp.duration) ?? "24h",
+            devices: (first(sp.devices) ?? "").split(",").filter((id) => deviceIds.has(id)),
+            allowAll: first(sp.allowAll) === "1",
+            dirs: (first(sp.dirs) ?? "").slice(0, 2000),
+            blockedDirs: (first(sp.blockedDirs) ?? "").slice(0, 2000),
+          }}
+        />
       )}
     </main>
   );
 }
 
 function Fatal({ message }: { message: string }) {
-  return <main><h1>Pedido inválido</h1><p>{message}</p></main>;
+  return (
+    <main className="narrow">
+      <h1>Pedido inválido</h1>
+      <p className="alert">{message}</p>
+      <p className="muted">Volta à aplicação que iniciou o pedido e tenta de novo.</p>
+    </main>
+  );
 }

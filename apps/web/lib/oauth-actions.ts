@@ -35,9 +35,18 @@ export async function decideConsent(form: FormData) {
   if (form.get("decision") !== "approve") {
     redirect(redirectWith(ok.redirectUri, { error: "access_denied", state: ok.state }, base));
   }
-  const back = () => {
+  // Em caso de erro volta ao ecrã com a mensagem exata e as escolhas preservadas.
+  const back = (message: string) => {
     const q = new URLSearchParams();
     for (const k of KEYS) { const v = form.get(k); if (typeof v === "string") q.set(k, v); }
+    q.set("form_error", message);
+    const keep = (name: string, v: FormDataEntryValue | null) => { if (typeof v === "string" && v) q.set(name, v.slice(0, 2000)); };
+    keep("preset", form.get("preset"));
+    keep("duration", form.get("duration"));
+    keep("devices", form.getAll("devices").map(String).join(","));
+    keep("dirs", form.get("dirs"));
+    keep("blockedDirs", form.get("blockedDirs"));
+    if (form.get("allowAll") === "on") q.set("allowAll", "1");
     return `/oauth/authorize?${q}`;
   };
 
@@ -46,16 +55,19 @@ export async function decideConsent(form: FormData) {
     duration: z.enum(["1h", "24h", "30d", "never"]),
     dirs: z.string().max(4000).optional().default(""),
   }).safeParse(Object.fromEntries(form));
+  if (!p.success) redirect(back("Dados inválidos. Revê as escolhas e tenta de novo."));
   const deviceIds = form.getAll("devices").map(String);
+  if (!deviceIds.length) redirect(back("Escolhe pelo menos um dispositivo."));
   const dirs = parseDirFields(form, user.allowAllDirsOk);
-  if (!p.success || !deviceIds.length || "error" in dirs) {
-    redirect(`${back()}&form_error=1`);
-  }
+  if ("error" in dirs) redirect(back(dirs.error));
+  const ceiling = checkCeiling(user, { preset: p.data.preset });
+  if (ceiling) redirect(back(ceiling));
+  const sudoErr = checkSudo(p.data.preset, p.data.duration, form);
+  if (sudoErr) redirect(back(sudoErr));
 
-  if (checkCeiling(user, { preset: p.data.preset }) || checkSudo(p.data.preset, p.data.duration, form)) redirect(`${back()}&form_error=1`);
   const devs = await db().select({ id: schema.devices.id }).from(schema.devices).where(and(
     eq(schema.devices.userId, user.id), isNull(schema.devices.revokedAt), inArray(schema.devices.id, deviceIds)));
-  if (!devs.length) redirect(`${back()}&form_error=1`);
+  if (!devs.length) redirect(back("Dispositivo inválido. Atualiza a página e escolhe de novo."));
 
   const ttl = DURATIONS[p.data.duration];
   const expiresAt = ttl ? new Date(Date.now() + ttl * 1000) : null;

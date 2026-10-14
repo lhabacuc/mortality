@@ -138,7 +138,7 @@ O painel (`/connect`) gera os snippets. Estado de compatibilidade:
 | Claude.ai / Desktop (custom connector) | OAuth | esperado funcionar — *não testado contra o cliente real* |
 | Claude Code | OAuth / PAT | esperado funcionar — configuração verificada na doc |
 | Gemini CLI | OAuth / PAT | esperado funcionar — verificada na doc |
-| Gemini web (app) | OAuth com Client ID/Secret manual | **não testado** — não faz registo automático; cria o cliente em *Clientes → Registar cliente OAuth* |
+| Gemini web (app) | OAuth (registo automático DCR) | **testado em uso real (2026-10-14)**: consentimento, `list_directory`, `read_file`, `start_search`, `write_file` no `audit_log`. Se o ecrã pedir Client ID/Secret, cria um em *Clientes → Registar cliente OAuth* |
 | Cursor | OAuth / PAT | esperado funcionar — verificada na doc |
 | VS Code (Copilot) | PAT (`inputs`) / OAuth | esperado funcionar — verificada na doc |
 | Grok, Qwen, outros | PAT | depende de o cliente aceitar cabeçalhos num servidor MCP HTTP |
@@ -165,8 +165,10 @@ diferentes do usado (o acesso a conectores personalizados depende do plano/works
 | Só leitura | listar, ler, pesquisar, informação do sistema |
 | Leitura e escrita | + escrever, editar, criar pastas, mover |
 | Terminal | + processos (por defeito com aprovação humana em `start_process`) |
-| **sudo-for-all** | **todas as ferramentas e o terminal, sem aprovações**. Exige confirmação explícita, dura no máximo 24 h e o admin tem de elevar o teto do utilizador (por defeito desligado) |
+| **sudo-for-all** | **todas as ferramentas e o terminal, sem aprovações**. Exige confirmação explícita e dura no máximo 24 h |
 
+- **Por defeito qualquer utilizador pode escolher qualquer nível** de acesso; o admin pode limitar o preset máximo, as tools e «todos os diretórios» por conta.
+- **As alterações aplicam-se de imediato:** o servidor lista sempre todas as ferramentas e decide a permissão em cada chamada, por isso mudar o acesso no painel não exige reconectar o cliente (os clientes guardam a lista de ferramentas em cache). `whoami` devolve as permissões atuais.
 - **Todos os diretórios** é opt-in por grant; continua limitado pela política local do dispositivo (`mortality policy allow-all on`).
 - **Diretórios bloqueados** prevalecem sobre tudo, no servidor **e** no relay (com `realpath`: um symlink não os contorna).
   Aplicam-se às ferramentas de ficheiros e pesquisa; um comando de terminal **não** é limitado por diretório (guardrail, não sandbox).

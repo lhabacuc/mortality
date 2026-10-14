@@ -43,6 +43,13 @@
       "when": 1791995047271,
       "tag": "0005_hard_senator_kelly",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791998049974,
+      "tag": "0006_lean_galactus",
+      "breakpoints": true
     }
   ]
 }

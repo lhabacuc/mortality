@@ -44,7 +44,7 @@ export default async function AdminUser({ params }: { params: Promise<{ id: stri
       )}
 
       <h2>Limites (teto)</h2>
-      <p>Nenhum grant deste utilizador pode exceder o teto; aplica-se também aos acessos já concedidos.</p>
+      <p>Opcional: por defeito o utilizador pode escolher qualquer nível. Se baixares o teto, nenhum grant pode excedê-lo, e aplica-se também aos acessos já concedidos.</p>
       <PanelForm action={setLimits} submit="Guardar limites">
         <input type="hidden" name="userId" value={u.id} />
         <label>Preset máximo{" "}

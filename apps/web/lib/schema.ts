@@ -16,7 +16,8 @@ export const users = pgTable("users", {
   status: text("status", { enum: ["pending", "active", "suspended"] }).notNull().default("pending"),
   mustChangePassword: boolean("must_change_password").notNull().default(false),
   // Tetos definidos pelo admin: nenhum grant do utilizador os pode exceder.
-  maxPreset: text("max_preset", { enum: ["read_only", "read_write", "terminal", "sudo_for_all"] }).notNull().default("terminal"),
+  // Por defeito qualquer utilizador pode escolher qualquer nível; o admin pode limitar por utilizador.
+  maxPreset: text("max_preset", { enum: ["read_only", "read_write", "terminal", "sudo_for_all"] }).notNull().default("sudo_for_all"),
   maxDevices: integer("max_devices").notNull().default(5),
   disabledTools: text("disabled_tools").array().notNull().default(sql`'{}'`),
   allowAllDirsOk: boolean("allow_all_dirs_ok").notNull().default(true),

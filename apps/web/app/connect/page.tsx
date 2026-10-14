@@ -41,18 +41,12 @@ claude mcp add --transport http mortality ${url} \\
 
       <h2>Gemini (web)</h2>
       <p>
-        Pede <strong>Client ID e Secret</strong> e não se regista sozinho. Cria-os em <a href="/clients">Clientes → Registar cliente OAuth</a>,
-        com o <em>redirect URI</em> que o Gemini mostra no ecrã do conector (começa por <code>https://…googleusercontent.com/…</code>), e cola-os no Gemini.
+        Adiciona o servidor MCP com o URL abaixo e escolhe autenticação <strong>OAuth</strong>: o Gemini regista-se sozinho e
+        mostra o ecrã de consentimento onde escolhes dispositivos, permissões e duração. Se o teu ecrã pedir mesmo
+        <strong>Client ID e Secret</strong>, cria-os em <a href="/clients">Clientes → Registar cliente OAuth</a> com o
+        <em> redirect URI</em> que o Gemini mostra.
       </p>
-      <Code>{`URL do servidor MCP:   ${url}
-Autenticação:         OAuth
-Client ID / Secret:   (os gerados em Clientes → Registar cliente OAuth)
-
-# se o ecrã pedir também os endpoints:
-Authorization URL:    ${base}/oauth/authorize
-Token URL:            ${base}/api/oauth/token
-Scope:                mcp:tools
-PKCE:                 S256   |   autenticação do cliente: client_secret_post ou client_secret_basic`}</Code>
+      <Code>{url}</Code>
       <p className="alert">Nunca coles um token (<code>mpat_…</code>) em «Client ID»: aparece no URL e é revogado automaticamente.</p>
 
       <h2>Gemini CLI</h2>

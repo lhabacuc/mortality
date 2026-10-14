@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { commandBlocked, pathAllowed } from "@mortality/shared";
+import { appUrl } from "@/lib/app-url";
 import { audit } from "@/lib/audit";
 import { baseUrl, preflight, withCors } from "@/lib/cors";
 import { canonicalResource } from "@/lib/oauth";
@@ -17,7 +18,6 @@ const text = (t: string, isError = false) => ({ content: [{ type: "text" as cons
 async function buildServer(ctx: McpContext, ip: string) {
   const grants = await activeGrants(ctx);
   const server = new McpServer({ name: "mortality", version: "0.2.0" });
-  const allowed = new Set(grants.flatMap((g) => g.tools));
 
   /** Verificação completa por chamada (secção 7.7) + job + audit. */
   async function call(tool: string, args: Record<string, unknown>) {
@@ -33,7 +33,11 @@ async function buildServer(ctx: McpContext, ip: string) {
       ];
       for (const p of paths) {
         const r = pathAllowed(g.permissions, p);
-        if (!r.ok) throw new AccessError(r.reason === "blocked" ? "Caminho bloqueado." : "Caminho fora dos diretórios permitidos.");
+        if (!r.ok) {
+          throw new AccessError(r.reason === "blocked"
+            ? `Caminho bloqueado pelo utilizador: ${p}`
+            : `Caminho fora dos diretórios permitidos para o dispositivo "${g.device.name}". Permitidos: ${g.permissions.allowedDirs.join(", ") || "nenhum"}. Usa um caminho dentro destes (o utilizador pode alterar em ${appUrl()}/clients).`);
+        }
       }
       if (tool === "start_process") {
         const hit = commandBlocked(String(args.command), g.permissions.blockedCommands);
@@ -56,26 +60,40 @@ async function buildServer(ctx: McpContext, ip: string) {
     }
   }
 
-  // Sempre registadas: dizem ao cliente em que estado está (e mantêm `tools/list` funcional sem grants).
-  server.registerTool("whoami", { description: "Utilizador e dispositivos acessíveis.", annotations: { readOnlyHint: true } },
-    async () => text(JSON.stringify({
-      user: ctx.userEmail, devices: grants.map((g) => g.device.name),
-      note: grants.length ? undefined : "Sem acessos ativos: concede acesso a este cliente no painel.",
-    })));
-  server.registerTool("list_devices", { description: "Lista os dispositivos a que este cliente tem acesso.", annotations: { readOnlyHint: true } },
+  // `whoami`: permissões ATUAIS por dispositivo. Mudam no painel sem o cliente reconectar.
+  server.registerTool("whoami", {
+    description: "Utilizador e permissões atuais por dispositivo (preset, tools, diretórios, aprovações, expiração). Consulta-o antes de assumir que não tens acesso: as permissões podem ter mudado.",
+    annotations: { readOnlyHint: true },
+  }, async () => text(JSON.stringify({
+    user: ctx.userEmail,
+    devices: grants.map((g) => ({
+      name: g.device.name,
+      preset: g.preset,
+      allowed_tools: g.tools,
+      all_directories: g.permissions.allowAllDirs,
+      allowed_directories: g.permissions.allowedDirs,
+      blocked_directories: g.permissions.blockedDirs,
+      requires_approval_for: g.requireApprovalFor,
+      read_only: g.permissions.readOnly,
+      expires_at: g.expiresAt,
+    })),
+    note: grants.length ? "Uma tool não permitida devolve erro; o utilizador pode alterar as permissões no painel e aplica-se de imediato." : "Sem acessos ativos: o utilizador tem de conceder acesso a este cliente no painel.",
+  }, null, 2)));
+  server.registerTool("list_devices", { description: "Lista os dispositivos a que este cliente tem acesso e se estão online.", annotations: { readOnlyHint: true } },
     async () => text(JSON.stringify(grants.map((g) => ({
       name: g.device.name, os: g.device.os, enabled: g.device.enabled, paused_locally: g.device.pausedLocally,
       online: !!g.device.lastSeenAt && Date.now() - g.device.lastSeenAt.getTime() < 45_000,
-      tools: g.tools, expires_at: g.expiresAt,
+      preset: g.preset, expires_at: g.expiresAt,
     })), null, 2)));
 
+  // Todas as tools são sempre listadas: os clientes guardam esta lista ao ligar e, como o servidor não
+  // consegue avisá-los de mudanças, a permissão é decidida a CADA chamada (em `call`). Assim, subir ou
+  // descer o acesso no painel aplica-se de imediato, sem reconectar nem atualizar o conector.
   for (const [name, def] of Object.entries(RELAY_TOOLS)) {
-    const tool = server.registerTool(name, {
+    server.registerTool(name, {
       description: def.description, inputSchema: def.shape,
       annotations: { readOnlyHint: def.readOnly, destructiveHint: !!def.destructive },
     }, async (args: Record<string, unknown>) => call(name, args));
-    // Sem grant para a tool: não aparece em `tools/list` e a chamada falha com "disabled".
-    if (!allowed.has(name)) tool.disable();
   }
   return server;
 }
