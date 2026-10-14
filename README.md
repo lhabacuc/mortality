@@ -134,6 +134,7 @@ O painel (`/connect`) gera os snippets. Estado de compatibilidade:
 | Claude.ai / Desktop (custom connector) | OAuth | esperado funcionar — *não testado contra o cliente real* |
 | Claude Code | OAuth / PAT | esperado funcionar — configuração verificada na doc |
 | Gemini CLI | OAuth / PAT | esperado funcionar — verificada na doc |
+| Gemini web (app) | OAuth com Client ID/Secret manual | **não testado** — não faz registo automático; cria o cliente em *Clientes → Registar cliente OAuth* |
 | Cursor | OAuth / PAT | esperado funcionar — verificada na doc |
 | VS Code (Copilot) | PAT (`inputs`) / OAuth | esperado funcionar — verificada na doc |
 | Grok, Qwen, outros | PAT | depende de o cliente aceitar cabeçalhos num servidor MCP HTTP |

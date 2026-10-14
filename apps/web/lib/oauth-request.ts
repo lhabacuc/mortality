@@ -1,5 +1,7 @@
 import { eq } from "drizzle-orm";
+import { audit } from "./audit";
 import { db, schema } from "./db";
+import { sha256 } from "./tokens";
 import { canonicalResource, isValidChallenge, normalizeResource, parseScope, redirectMatches } from "./oauth";
 
 export type AuthRequest =
@@ -18,7 +20,21 @@ export async function validateAuthRequest(get: (k: string) => string | null, bas
     ? await db().select().from(schema.oauthClients).where(eq(schema.oauthClients.clientId, clientId)).limit(1)
     : [];
   // Sem cliente/redirect válidos nunca se redireciona (evita open redirect).
-  if (!client) return { kind: "fatal", message: "Cliente desconhecido." };
+  if (!client) {
+    // Um token de acesso colado no campo «Client ID»: ficou exposto no URL → revogar já.
+    if (clientId.startsWith("mpat_")) {
+      const [t] = await db().select({ id: schema.accessTokens.id, userId: schema.accessTokens.userId })
+        .from(schema.accessTokens).where(eq(schema.accessTokens.tokenHash, sha256(clientId))).limit(1);
+      if (t) {
+        const now = new Date();
+        await db().update(schema.accessTokens).set({ revokedAt: now }).where(eq(schema.accessTokens.id, t.id));
+        await db().update(schema.clientGrants).set({ revokedAt: now }).where(eq(schema.clientGrants.clientId, t.id));
+        await audit({ userId: t.userId, actor: "system", action: "pat.revoke", argsSummary: "token exposto como client_id" });
+      }
+      return { kind: "fatal", message: "O que colaste em «Client ID» é um token de acesso (mpat_…). Por segurança foi revogado, porque apareceu num URL. Cria um cliente OAuth em Clientes → «Registar cliente OAuth» e usa o Client ID e o Secret gerados." };
+    }
+    return { kind: "fatal", message: "Cliente desconhecido. Se a aplicação pede Client ID e Secret, cria um cliente em Clientes → «Registar cliente OAuth»." };
+  }
   if (!redirectMatches(client.redirectUris, redirectUri)) return { kind: "fatal", message: "redirect_uri não registado para este cliente." };
 
   const state = get("state");

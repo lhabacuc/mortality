@@ -82,6 +82,7 @@ export default function Guide() {
         <li><strong>ChatGPT:</strong> Settings → Connectors → Advanced → Developer mode → Create → URL acima → OAuth.</li>
         <li><strong>Claude.ai:</strong> <em>+</em> → Add custom connector → URL acima.</li>
         <li><strong>Claude Code:</strong> <code>claude mcp add --transport http mortality {mcp}</code></li>
+        <li><strong>Gemini web:</strong> pede Client ID e Secret; cria-os em <a href="/clients">Clientes → Registar cliente OAuth</a> (ver <a href="/connect">Ligar</a>).</li>
         <li><strong>Sem OAuth:</strong> cria um <a href="/tokens">token</a> e envia-o em <code>Authorization: Bearer …</code>.</li>
       </ul>
       <p>No ecrã de consentimento escolhes <em>que dispositivos</em>, <em>que permissões</em> e <em>por quanto tempo</em>. Sem dispositivo escolhido, o cliente não fica com acesso.</p>

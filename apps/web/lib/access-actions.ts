@@ -9,6 +9,10 @@ import { db, schema } from "./db";
 import { requireUser } from "./guard";
 import type { PanelState } from "./panel-actions";
 import { revokeClientForUser } from "./oauth-tokens";
+import { validRedirectUri } from "./oauth";
+import { allow } from "./ratelimit";
+import { newSecret, sha256 } from "./tokens";
+import { randomUUID } from "node:crypto";
 
 const DURATIONS: Record<string, number | null> = { "1h": 3600, "24h": 86400, "30d": 2592000, never: null };
 const lines = (v: FormDataEntryValue | null) =>
@@ -129,4 +133,24 @@ export async function revokeOAuthClient(form: FormData) {
   await revokeClientForUser(user.id, clientId);
   await audit({ userId: user.id, clientId, actor: "user", action: "oauth_client.revoke" });
   revalidatePath("/clients");
+}
+
+/** Para aplicações que pedem Client ID/Secret e não fazem registo automático (ex.: Gemini web). */
+export async function createOAuthClient(_: PanelState, form: FormData): Promise<PanelState> {
+  const user = await requireUser();
+  if (!(await allow(`oauthclient:${user.id}`, 10, 3600))) return { error: "Demasiados registos. Tenta mais tarde." };
+  const p = z.object({ name: z.string().trim().min(1).max(80), uris: z.string().max(4000) }).safeParse(Object.fromEntries(form));
+  if (!p.success) return { error: "Indica um nome e pelo menos um redirect URI." };
+  const uris = [...new Set(p.data.uris.split("\n").map((u) => u.trim()).filter(Boolean))];
+  if (!uris.length || uris.length > 5) return { error: "Indica entre 1 e 5 redirect URIs (um por linha)." };
+  if (!uris.every(validRedirectUri)) return { error: "Redirect URI inválido (usa https, ou http em localhost)." };
+
+  const clientId = `mcl_${randomUUID()}`;
+  const secret = newSecret("mcs");
+  await db().insert(schema.oauthClients).values({
+    clientId, clientSecretHash: sha256(secret), redirectUris: uris, name: p.data.name,
+  });
+  await audit({ userId: user.id, clientId, actor: "user", action: "oauth_client.create", argsSummary: p.data.name });
+  revalidatePath("/clients");
+  return { token: `Client ID:      ${clientId}\nClient Secret:  ${secret}` };
 }

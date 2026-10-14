@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
-import { addGrant, disconnectAll, revokeGrant, revokeOAuthClient, updateGrant } from "@/lib/access-actions";
+import { addGrant, createOAuthClient, disconnectAll, revokeGrant, revokeOAuthClient, updateGrant } from "@/lib/access-actions";
 import { PanelForm } from "../panel-form";
 import { ago, until } from "@/lib/format";
 import { GrantFields } from "../grant-fields";
@@ -96,6 +96,20 @@ export default async function Clients() {
           </section>
         );
       })}
-          </main>
+            <h2>Registar cliente OAuth</h2>
+      <p className="muted">
+        Para aplicações que pedem <strong>Client ID e Secret</strong> (por exemplo o Gemini web). As que se registam
+        sozinhas (ChatGPT, Claude) não precisam disto. <strong>Nunca</strong> uses um token de acesso como Client ID.
+      </p>
+      <details>
+        <summary>Novo cliente OAuth</summary>
+        <PanelForm action={createOAuthClient} submit="Criar cliente" tokenLabel="Mostrado uma única vez — guarda o Secret agora">
+          <label>Nome <input name="name" required maxLength={80} placeholder="Gemini web" /></label>
+          <label>Redirect URI (um por linha — copia-o do ecrã da aplicação)
+            <textarea name="uris" rows={2} required placeholder="https://…" />
+          </label>
+        </PanelForm>
+      </details>
+    </main>
   );
 }
