@@ -4,6 +4,7 @@ import { ONLINE_THRESHOLD_MS } from "@mortality/shared";
 import { db, schema } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/session";
+import { appUrl } from "@/lib/app-url";
 import { actionLabel, ago } from "@/lib/format";
 
 export default async function Dashboard() {
@@ -39,7 +40,7 @@ export default async function Dashboard() {
         <div className="empty">
           <strong>Começa por ligar um computador.</strong>
           <ol>
-            <li>Instala o relay e corre <code>mortality install --server …</code> (<Link href="/guide">ver guia</Link>).</li>
+            <li>Num terminal do computador: <code>curl -fsSL {appUrl()}/install | bash</code> (<Link href="/guide">ver guia</Link>).</li>
             <li>Confirma o código em <Link href="/device">Emparelhar dispositivo</Link>.</li>
           </ol>
         </div>

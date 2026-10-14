@@ -6,3 +6,4 @@ dist
 *.tsbuildinfo
 .playwright-mcp
 .vercel
+apps/web/public/cli

@@ -1,14 +1,25 @@
 {
   "name": "mortality",
   "version": "0.2.0",
-  "description": "Relay local do Mortality (systemd --user). Não executa comandos de clientes locais.",
+  "description": "Relay local do Mortality (systemd --user). N\u00e3o executa comandos de clientes locais.",
   "type": "module",
-  "bin": { "mortality": "dist/index.js" },
-  "engines": { "node": ">=18" },
-  "files": ["dist"],
+  "bin": {
+    "mortality": "dist/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p .",
-    "test": "node --experimental-strip-types --test src/*.test.ts"
+    "test": "node --experimental-strip-types --test src/*.test.ts",
+    "bundle": "node scripts/bundle.mjs"
   },
-  "devDependencies": { "@types/node": "^24.0.0", "typescript": "^5.9.0" }
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "esbuild": "^0.25.0"
+  }
 }

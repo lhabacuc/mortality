@@ -3,6 +3,8 @@
 Painel web + relay para dar a clientes de IA (Claude, ChatGPT, Gemini, Cursor, VS Code…) acesso **controlado e revogável**
 às tuas máquinas, via [MCP](https://modelcontextprotocol.io). Open source, deploy em **Vercel + Neon**.
 
+Repositório: <https://github.com/lhabacuc/mortality>
+
 > **Princípio:** o painel web é o único plano de controlo. Nenhum cliente acede a nada por ter conta ou token:
 > precisa de um **grant explícito (cliente × dispositivo)** dado no painel. Por defeito, **acesso negado**.
 > A CLI `mortality` não executa tools nem fala MCP: só instala e gere o relay.
@@ -32,17 +34,17 @@ secções (Dispositivos, Tokens, Clientes, Aprovações, Atividade, Ligar, Guia,
 ## Arranque local
 
 ```bash
+git clone https://github.com/lhabacuc/mortality && cd mortality
 pnpm install
 cp .env.example apps/web/.env      # preenche DATABASE_URL, SESSION_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
 pnpm db:migrate
 pnpm dev                            # http://localhost:3000
 ```
 
-Faz login com o admin (troca de password obrigatória) e emparelha um dispositivo:
+Faz login com o admin (troca de password obrigatória) e emparelha um dispositivo (ver [Instalar o relay](#instalar-o-relay)):
 
 ```bash
-pnpm --filter mortality build
-node packages/cli/dist/index.js install --server http://localhost:3000
+curl -fsSL http://localhost:3000/install | bash
 ```
 
 ## Deploy (Vercel + Neon)
@@ -50,7 +52,7 @@ node packages/cli/dist/index.js install --server http://localhost:3000
 > **Testado em 2026-10-14** num deploy real (Vercel Hobby + Neon Free). O passo a passo com comandos está em [`DEPLOY.md`](DEPLOY.md).
 
 1. Cria um projeto Neon e copia a connection string **pooled**.
-2. Importa o repositório na Vercel com **Root Directory = `apps/web`** (ativa *Include source files outside of the Root Directory*, necessário para `packages/shared`).
+2. Importa `lhabacuc/mortality` na Vercel (ou usa a CLI, ver [`DEPLOY.md`](DEPLOY.md)) com **Root Directory = `apps/web`** (ativa *Include source files outside of the Root Directory*, necessário para `packages/shared`).
 3. Define as variáveis de `.env.example` (no mínimo `DATABASE_URL`, `APP_URL`, `SESSION_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`).
    `APP_URL` tem de ser o URL **público e definitivo**: é o `issuer` e o `resource` OAuth.
 4. O `vercel.json` corre `pnpm db:migrate` antes do build (migrações idempotentes). **Define `DATABASE_URL` antes do 1º deploy**, senão o build falha logo nessa etapa.
@@ -83,6 +85,22 @@ Medido localmente (dev server → Neon us-east-2, RTT elevado) e calculado a par
 
 Active CPU da Vercel **não foi medido** (precisa de um deploy real).
 
+## Instalar o relay
+
+Numa linha, a partir do **teu** painel (o instalador é servido por ele, por isso o servidor já vem configurado):
+
+```bash
+curl -fsSL https://<o-teu-painel>/install | bash
+```
+
+O script: verifica Node ≥ 18, descarrega a CLI de `/cli/mortality.mjs`, **verifica o SHA-256**, instala em
+`~/.local/bin/mortality` (sem `sudo`) e pergunta se queres emparelhar já. Para o ler antes: `curl -fsSL https://<o-teu-painel>/install`.
+Remover: `mortality uninstall` e depois `curl -fsSL https://<o-teu-painel>/install | bash -s -- --uninstall`.
+
+> **Domínio próprio:** para teres `curl … https://o-teu-dominio/install | bash`, adiciona o domínio ao projeto Vercel
+> (`vercel domains add`) — o script usa sempre a origem que o serve. Não publiques um comando que aponte para um domínio que não controlas:
+> quem o executar corre o que esse servidor devolver.
+
 ## Relay
 
 | SO | Backend | Estado |
@@ -95,7 +113,7 @@ Em Linux, sem *linger* o relay só corre com sessão aberta: `loginctl enable-li
 Reiniciar o serviço mata as sessões de processo em curso.
 
 ```
-mortality install --server URL   mortality status [--json]   mortality logs [-f]
+mortality install [--server URL] mortality status [--json]   mortality logs [-f]
 mortality pause | resume         mortality restart           mortality policy show|edit
 mortality uninstall              mortality run [--service]
 ```

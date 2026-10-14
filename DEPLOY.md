@@ -48,7 +48,7 @@ curl -s -X POST <URL>/api/oauth/register -H 'content-type: application/json' \
 
 ## 6. Relay → servidor de produção
 ```bash
-node packages/cli/dist/index.js install --server <URL>      # aprova o código em <URL>/device
+curl -fsSL <URL>/install | bash        # instala a CLI e oferece emparelhar; aprova o código em <URL>/device
 ```
 
 ## 7. ChatGPT (web)

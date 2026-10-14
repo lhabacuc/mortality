@@ -46,24 +46,25 @@ export default function Guide() {
       </ol>
 
       <h2>3. Instalar o relay</h2>
-      <p>Requisitos: Node.js ≥ 18. Linux (systemd), macOS (launchd) ou Windows (Task Scheduler).</p>
-      <Code>{`# a partir do repositório do projeto
-pnpm install
-pnpm --filter mortality build
-
-# emparelhar e instalar o serviço (Linux/macOS/Windows)
-node packages/cli/dist/index.js install --server ${base}
-#   opcional: --name "o-meu-pc"  --dir /caminho/permitido`}</Code>
+      <p>Requisitos: Node.js ≥ 18 e <code>curl</code>. Linux (systemd), macOS (launchd) ou Windows (Task Scheduler, via a CLI).</p>
+      <Code>{`curl -fsSL ${base}/install | bash`}</Code>
       <p>
-        O instalador pede o <strong>diretório de trabalho permitido</strong> (a política local), mostra um código e abre o
-        painel. Confirma que o código coincide e aprova. Depois o serviço fica a correr em segundo plano.
+        Uma linha. O instalador descarrega a CLI deste servidor, <strong>verifica o checksum</strong>, instala em
+        <code> ~/.local/bin</code> (sem <code>sudo</code>) e pergunta se queres emparelhar já. Prefere ler antes de executar?
+        <code> curl -fsSL {base}/install</code> mostra o script.
+      </p>
+      <p>
+        Emparelhar: o comando mostra um código; confirma-o em <a href="/device">Emparelhar dispositivo</a> e dá-lhe um nome.
+        O instalador pede o <strong>diretório de trabalho permitido</strong> (a política local). Depois o serviço fica em segundo plano.
       </p>
       <p><em>Linux:</em> sem <code>linger</code> o relay só corre com sessão aberta. Para correr após reiniciar:
         <code> loginctl enable-linger $USER</code> (o instalador avisa, mas nunca o executa por ti).</p>
+      <p>Remover: <code>mortality uninstall</code> (revoga o dispositivo e para o serviço) e depois
+        <code> curl -fsSL {base}/install | bash -s -- --uninstall</code>.</p>
 
       <h3>Comandos</h3>
       <Table head={["Comando", "O que faz"]} rows={[
-        ["mortality install --server URL", "Emparelha o dispositivo e instala/inicia o serviço"],
+        ["mortality install", "Emparelha o dispositivo e instala/inicia o serviço (o servidor já vem configurado)"],
         ["mortality status [--json]", "Estado do serviço, ligação, pausa local e política ativa"],
         ["mortality logs [-f]", "Mostra (ou segue) os logs do relay"],
         ["mortality pause", "Pausa local imediata: o relay deixa de executar jobs (funciona offline)"],

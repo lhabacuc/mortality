@@ -51,7 +51,7 @@ export default async function Devices() {
         </div>
       )}
       <h2>Adicionar dispositivo</h2>
-      <CodeBlock>{`mortality install --server ${appUrl()}`}</CodeBlock>
+      <CodeBlock>{`curl -fsSL ${appUrl()}/install | bash`}</CodeBlock>
       <p className="muted">Depois confirma o código em <Link href="/device">Emparelhar dispositivo</Link>. Precisas de ajuda? <Link href="/guide">Guia</Link>.</p>
     </main>
   );
