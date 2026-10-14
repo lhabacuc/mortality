@@ -83,3 +83,30 @@ export function commandBlocked(command: string, blocked: string[]): string | nul
   }
   return null;
 }
+
+export const PRESET_ORDER = ["read_only", "read_write", "terminal"] as const;
+export type CeilingPreset = (typeof PRESET_ORDER)[number];
+export const presetRank = (p: string) => PRESET_ORDER.indexOf(p as CeilingPreset);
+
+/** Tools que o teto do utilizador permite (preset máximo menos tools proibidas). */
+export function ceilingTools(maxPreset: string, disabledTools: string[]): string[] {
+  const allowed = toolsForPreset((PRESET_ORDER.includes(maxPreset as CeilingPreset) ? maxPreset : "read_only") as Preset);
+  return allowed.filter((t) => !disabledTools.includes(t));
+}
+
+/** Erro (texto) se o grant pedido excede o teto; senão null. */
+export function checkCeiling(
+  ceiling: { maxPreset: string; disabledTools: string[] },
+  want: { preset: string; tools?: string[] },
+): string | null {
+  const cap = ceilingTools(ceiling.maxPreset, ceiling.disabledTools);
+  if (want.preset === "custom") {
+    const bad = (want.tools ?? []).filter((t) => !cap.includes(t));
+    return bad.length ? `Tools acima do teu limite: ${bad.join(", ")}.` : null;
+  }
+  if (presetRank(want.preset) > presetRank(ceiling.maxPreset)) {
+    return `O teu limite máximo é "${ceiling.maxPreset}".`;
+  }
+  const over = toolsForPreset(want.preset as Preset).filter((t) => !cap.includes(t));
+  return over.length ? `Este preset inclui tools proibidas para a tua conta: ${over.join(", ")}.` : null;
+}

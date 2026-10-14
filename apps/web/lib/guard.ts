@@ -8,3 +8,10 @@ export async function requireUser() {
   if (u.mustChangePassword) redirect("/change-password");
   return u;
 }
+
+/** Papel `admin` verificado no servidor a cada pedido. */
+export async function requireAdmin() {
+  const u = await requireUser();
+  if (u.role !== "admin") redirect("/dashboard");
+  return u;
+}

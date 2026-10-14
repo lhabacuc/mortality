@@ -1,7 +1,9 @@
 import { ALL_TOOLS } from "@mortality/shared";
 
+export const APPROVAL_TOOLS = ["start_process", "interact_with_process", "write_file", "edit_block", "move_file", "terminate_session"];
+
 export interface GrantDefaults {
-  preset?: string; dirs?: string[]; blocked?: string[]; readOnly?: boolean; tools?: string[]; approveProcess?: boolean;
+  preset?: string; dirs?: string[]; blocked?: string[]; readOnly?: boolean; tools?: string[]; approve?: string[];
 }
 
 /** Campos partilhados entre "editar grant" e "dar acesso". */
@@ -30,7 +32,14 @@ export function GrantFields({ d = {}, keepDuration }: { d?: GrantDefaults; keepD
         <textarea name="blocked" rows={2} defaultValue={(d.blocked ?? []).join("\n")} style={{ width: "100%" }} />
       </label>
       <label><input type="checkbox" name="readOnly" defaultChecked={d.readOnly} /> Forçar só leitura</label>
-      <label><input type="checkbox" name="approveProcess" defaultChecked={d.approveProcess} /> Exigir aprovação humana para <code>start_process</code> (até à Fase 6 a tool fica negada)</label>
+      <fieldset>
+        <legend>Exigir aprovação humana no painel para</legend>
+        {APPROVAL_TOOLS.map((t) => (
+          <label key={t} style={{ display: "inline-block", marginRight: 12 }}>
+            <input type="checkbox" name="approve" value={t} defaultChecked={d.approve?.includes(t)} /> <code>{t}</code>
+          </label>
+        ))}
+      </fieldset>
       <details>
         <summary>Tools (só usadas no preset Personalizado)</summary>
         {ALL_TOOLS.map((t) => (

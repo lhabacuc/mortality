@@ -15,6 +15,10 @@ export const users = pgTable("users", {
   role: text("role", { enum: ["admin", "user"] }).notNull().default("user"),
   status: text("status", { enum: ["pending", "active", "suspended"] }).notNull().default("pending"),
   mustChangePassword: boolean("must_change_password").notNull().default(false),
+  // Tetos definidos pelo admin: nenhum grant do utilizador os pode exceder.
+  maxPreset: text("max_preset", { enum: ["read_only", "read_write", "terminal"] }).notNull().default("terminal"),
+  maxDevices: integer("max_devices").notNull().default(5),
+  disabledTools: text("disabled_tools").array().notNull().default(sql`'{}'`),
   createdAt: createdAt(),
   approvedBy: uuid("approved_by"),
   approvedAt: ts("approved_at"),
@@ -157,3 +161,14 @@ export const rateLimits = pgTable("rate_limits", {
   windowStart: ts("window_start").notNull(),
   count: integer("count").notNull().default(0),
 }, (t) => [uniqueIndex("rate_limits_pk").on(t.key, t.windowStart)]);
+
+export const invites = pgTable("invites", {
+  id: id(),
+  tokenHash: text("token_hash").notNull().unique(),
+  email: text("email"),
+  createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: createdAt(),
+  expiresAt: ts("expires_at").notNull(),
+  usedAt: ts("used_at"),
+  usedBy: uuid("used_by"),
+});

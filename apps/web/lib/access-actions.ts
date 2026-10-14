@@ -3,7 +3,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { ALL_TOOLS } from "@mortality/shared";
+import { ALL_TOOLS, checkCeiling } from "@mortality/shared";
 import { audit } from "./audit";
 import { db, schema } from "./db";
 import { requireUser } from "./guard";
@@ -34,7 +34,7 @@ function parseGrant(form: FormData) {
       blockedCommands: lines(form.get("blocked")).map((b) => b.slice(0, 100)),
       readOnly: form.get("readOnly") === "on",
       allowedTools: base.data.preset === "custom" ? tools : [],
-      requireApprovalFor: form.get("approveProcess") === "on" ? ["start_process"] : [],
+      requireApprovalFor: form.getAll("approve").map(String).filter((t) => ALL_TOOLS.includes(t)),
     },
   } as const;
 }
@@ -47,6 +47,8 @@ export async function updateGrant(_: PanelState, form: FormData): Promise<PanelS
   if (!id.success) return { error: "Grant inválido." };
   const g = parseGrant(form);
   if ("error" in g) return { error: g.error };
+  const over = checkCeiling(user, { preset: g.value.preset, tools: g.value.allowedTools });
+  if (over) return { error: over };
   const exp = expiry(g.value.duration);
   const res = await db().update(schema.clientGrants).set({
     preset: g.value.preset, allowedDirs: g.value.allowedDirs, blockedCommands: g.value.blockedCommands,
@@ -66,6 +68,8 @@ export async function addGrant(_: PanelState, form: FormData): Promise<PanelStat
   if (!ids.success) return { error: "Dados inválidos." };
   const g = parseGrant(form);
   if ("error" in g) return { error: g.error };
+  const over = checkCeiling(user, { preset: g.value.preset, tools: g.value.allowedTools });
+  if (over) return { error: over };
 
   // O cliente tem de ser um PAT do utilizador ou um cliente OAuth ao qual ele já deu acesso.
   const isUuid = z.string().uuid().safeParse(ids.data.clientId).success;

@@ -5,6 +5,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { checkCeiling } from "@mortality/shared";
 import { audit } from "./audit";
 import { db, schema } from "./db";
 import { requireUser } from "./guard";
@@ -49,6 +50,7 @@ export async function decideConsent(form: FormData) {
     redirect(`${back()}&form_error=1`);
   }
 
+  if (checkCeiling(user, { preset: p.data.preset })) redirect(`${back()}&form_error=1`);
   const devs = await db().select({ id: schema.devices.id }).from(schema.devices).where(and(
     eq(schema.devices.userId, user.id), isNull(schema.devices.revokedAt), inArray(schema.devices.id, deviceIds)));
   if (!devs.length) redirect(`${back()}&form_error=1`);

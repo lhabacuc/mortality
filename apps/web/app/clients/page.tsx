@@ -73,7 +73,7 @@ export default async function Clients() {
                     <input type="hidden" name="grantId" value={g.id} />
                     <GrantFields keepDuration d={{
                       preset: g.preset, dirs: g.allowedDirs, blocked: g.blockedCommands, readOnly: g.readOnly,
-                      tools: g.allowedTools, approveProcess: g.requireApprovalFor.includes("start_process"),
+                      tools: g.allowedTools, approve: g.requireApprovalFor,
                     }} />
                   </PanelForm>
                   <form action={revokeGrant}>

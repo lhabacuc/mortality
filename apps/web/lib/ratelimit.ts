@@ -15,3 +15,5 @@ export async function allow(key: string, limit: number, windowSeconds: number): 
 export function clientIp(req: Request): string {
   return req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
 }
+
+export const ipFromHeaders = (h: Headers) => h.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";

@@ -1,5 +1,5 @@
 import { and, eq, isNull, or, gt } from "drizzle-orm";
-import { ONLINE_THRESHOLD_MS, toolsForPreset, type EffectivePermissions, type Preset } from "@mortality/shared";
+import { ONLINE_THRESHOLD_MS, ceilingTools, toolsForPreset, type EffectivePermissions, type Preset } from "@mortality/shared";
 import { db, schema } from "./db";
 import { bearer, sha256 } from "./tokens";
 
@@ -48,6 +48,10 @@ export interface ActiveGrant {
 /** Grants ativos do cliente (deny-by-default: sem linha = sem acesso). */
 export async function activeGrants(ctx: McpContext): Promise<ActiveGrant[]> {
   const now = new Date();
+  const [owner] = await db().select({ maxPreset: schema.users.maxPreset, disabledTools: schema.users.disabledTools })
+    .from(schema.users).where(eq(schema.users.id, ctx.userId)).limit(1);
+  if (!owner) return [];
+  const cap = ceilingTools(owner.maxPreset, owner.disabledTools);
   const rows = await db().select({ g: schema.clientGrants, d: schema.devices })
     .from(schema.clientGrants)
     .innerJoin(schema.devices, eq(schema.devices.id, schema.clientGrants.deviceId))
@@ -61,7 +65,8 @@ export async function activeGrants(ctx: McpContext): Promise<ActiveGrant[]> {
     ));
   return rows.map(({ g, d }) => {
     const preset = g.preset as Preset;
-    const tools = preset === "custom" ? g.allowedTools : toolsForPreset(preset);
+    const raw = preset === "custom" ? g.allowedTools : toolsForPreset(preset);
+    const tools = raw.filter((t) => cap.includes(t));
     return {
       grantId: g.id, device: d, tools: g.readOnly ? tools.filter((t) => toolsForPreset("read_only").includes(t)) : tools,
       permissions: { allowedDirs: g.allowedDirs, blockedCommands: g.blockedCommands, readOnly: g.readOnly },

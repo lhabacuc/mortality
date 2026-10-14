@@ -4,6 +4,8 @@ import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { checkCeiling } from "@mortality/shared";
+import { count } from "drizzle-orm";
 import { db, schema } from "./db";
 import { requireUser } from "./guard";
 import { allow } from "./ratelimit";
@@ -32,6 +34,9 @@ export async function decideDevice(form: FormData) {
   if (!dc || dc.status !== "pending" || dc.expiresAt < new Date()) redirect("/device?error=expired");
 
   if (approve) {
+    const [{ n }] = await db().select({ n: count() }).from(schema.devices)
+      .where(and(eq(schema.devices.userId, user.id), isNull(schema.devices.revokedAt)));
+    if (n >= user.maxDevices) redirect(`/device?code=${code}&error=limit`);
     const [clash] = await db().select({ id: schema.devices.id }).from(schema.devices)
       .where(and(eq(schema.devices.userId, user.id), eq(schema.devices.name, name), isNull(schema.devices.revokedAt))).limit(1);
     if (clash) redirect(`/device?code=${code}&error=name`);
@@ -81,6 +86,8 @@ export async function createPat(_: PanelState, form: FormData): Promise<PanelSta
   if (!dirs.length || dirs.some((d) => !/^([/~]|[a-zA-Z]:[\\/])/.test(d))) {
     return { error: "Indica pelo menos um diretório absoluto permitido (um por linha)." };
   }
+  const over = checkCeiling(user, { preset: p.data.preset });
+  if (over) return { error: over };
   const [device] = await db().select({ id: schema.devices.id }).from(schema.devices)
     .where(and(eq(schema.devices.id, p.data.deviceId), eq(schema.devices.userId, user.id), isNull(schema.devices.revokedAt))).limit(1);
   if (!device) return { error: "Dispositivo inválido." };

@@ -1,6 +1,7 @@
 "use server";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, gt, isNull, ne } from "drizzle-orm";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -10,6 +11,9 @@ import { hashPassword, verifyPassword } from "./password";
 import { currentUser, endSession, startSession } from "./session";
 import { ensureAdmin } from "./bootstrap";
 import { safeNext } from "./oauth";
+import { allow, ipFromHeaders } from "./ratelimit";
+import { audit } from "./audit";
+import { sha256 } from "./tokens";
 
 const Email = z.string().trim().toLowerCase().email().max(254);
 const Pass = z.string().min(10, "mínimo 10 caracteres").max(200);
@@ -18,20 +22,42 @@ const GENERIC = "Credenciais inválidas.";
 export type FormState = { error?: string } | undefined;
 
 export async function signup(_: FormState, form: FormData): Promise<FormState> {
+  const ip = ipFromHeaders(await headers());
+  if (!(await allow(`signup:${ip}`, 10, 3600))) return { error: "Demasiados registos. Tenta mais tarde." };
   const parsed = z.object({
     email: Email, password: Pass, name: z.string().trim().min(1).max(80),
   }).safeParse(Object.fromEntries(form));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const mode = SignupMode.catch("approval").parse(process.env.SIGNUP_MODE);
-  if (mode === "invite_only") return { error: "Registo apenas por convite." };
-
   const { email, password, name } = parsed.data;
+  const inviteRaw = String(form.get("invite") ?? "");
+
+  // Convite: uso único, pré-aprova a conta em qualquer modo.
+  let inviteHash: string | null = null;
+  if (inviteRaw) {
+    inviteHash = sha256(inviteRaw);
+    const claimed = await db().update(schema.invites).set({ usedAt: new Date() })
+      .where(and(eq(schema.invites.tokenHash, inviteHash), isNull(schema.invites.usedAt), gt(schema.invites.expiresAt, new Date())))
+      .returning({ email: schema.invites.email });
+    if (!claimed.length) return { error: "Convite inválido, expirado ou já usado." };
+    if (claimed[0].email && claimed[0].email !== email) {
+      await db().update(schema.invites).set({ usedAt: null }).where(eq(schema.invites.tokenHash, inviteHash));
+      return { error: "Este convite é para outro email." };
+    }
+  } else if (mode === "invite_only") {
+    return { error: "Registo apenas por convite." };
+  }
+
   const inserted = await db().insert(schema.users).values({
     email, name, passwordHash: await hashPassword(password),
-    status: mode === "open" ? "active" : "pending",
+    status: inviteHash || mode === "open" ? "active" : "pending",
   }).onConflictDoNothing().returning({ id: schema.users.id });
-  if (!inserted.length) return { error: "Não foi possível criar a conta." };
+  if (!inserted.length) {
+    if (inviteHash) await db().update(schema.invites).set({ usedAt: null }).where(eq(schema.invites.tokenHash, inviteHash));
+    return { error: "Não foi possível criar a conta." };
+  }
+  if (inviteHash) await db().update(schema.invites).set({ usedBy: inserted[0].id }).where(eq(schema.invites.tokenHash, inviteHash));
   redirect("/login?registered=1");
 }
 
@@ -40,6 +66,10 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   const parsed = z.object({ email: Email, password: z.string().max(200) })
     .safeParse(Object.fromEntries(form));
   if (!parsed.success) return { error: GENERIC };
+  const ip = ipFromHeaders(await headers());
+  if (!(await allow(`login:ip:${ip}`, 30, 600)) || !(await allow(`login:email:${parsed.data.email}`, 10, 600))) {
+    return { error: "Demasiadas tentativas. Tenta mais tarde." };
+  }
 
   const [user] = await db().select().from(schema.users)
     .where(eq(schema.users.email, parsed.data.email)).limit(1);
@@ -99,5 +129,6 @@ export async function adminUserAction(form: FormData) {
     await db().update(schema.users).set({ status: "active" })
       .where(and(target, eq(schema.users.status, "suspended")));
   }
+  await audit({ userId, actor: "admin", action: `admin.user.${op}`, argsSummary: `by ${admin.email}` });
   revalidatePath("/admin");
 }

@@ -16,6 +16,7 @@ export default async function DevicePage({ searchParams }: { searchParams: Promi
     <main>
       <h1>Emparelhar dispositivo</h1>
       {error === "expired" && <p role="alert">Código expirado ou já usado.</p>}
+      {error === "limit" && <p role="alert">Atingiste o limite de dispositivos definido pelo administrador.</p>}
       {error === "name" && <p role="alert">Já tens um dispositivo com esse nome.</p>}
       {valid ? (
         <form action={decideDevice} style={{ display: "grid", gap: 12 }}>

@@ -8,7 +8,7 @@ import { bearer } from "@/lib/tokens";
 import { clientIp, allow } from "@/lib/ratelimit";
 import { JobError, runJob } from "@/lib/jobs";
 import { AccessError, activeGrants, authenticateMcp, resolveDevice, type McpContext } from "@/lib/mcp-access";
-import { MAX_RESPONSE_CHARS, RELAY_TOOLS, summarizeArgs } from "@/lib/mcp-tools";
+import { MAX_RESPONSE_CHARS, RELAY_TOOLS, describeForApproval, summarizeArgs } from "@/lib/mcp-tools";
 
 export const maxDuration = 60;
 
@@ -38,13 +38,11 @@ async function buildServer(ctx: McpContext, ip: string) {
         const hit = commandBlocked(String(args.command), g.permissions.blockedCommands);
         if (hit) throw new AccessError(`Comando bloqueado: "${hit}".`);
       }
-      if (g.requireApprovalFor.includes(tool)) {
-        throw new AccessError("Esta tool requer aprovação humana no painel (ainda não disponível).");
-      }
       const { device: _d, ...jobArgs } = args;
       const result = await runJob({
         userId: ctx.userId, deviceId: g.device.id, clientId: ctx.clientKey, tool,
         args: jobArgs, permissions: g.permissions,
+        approval: g.requireApprovalFor.includes(tool) ? { summary: describeForApproval(tool, jobArgs) } : undefined,
       });
       await audit({ userId: ctx.userId, deviceId, clientId: ctx.clientKey, actor: "mcp", action: "tool.call", tool, argsSummary: summary, ip });
       let out = JSON.stringify(result, null, 2);

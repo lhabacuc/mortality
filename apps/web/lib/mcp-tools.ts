@@ -85,3 +85,17 @@ export function summarizeArgs(args: Record<string, unknown>): string {
 }
 
 export const MAX_RESPONSE_CHARS = 100_000;
+
+/** O que o utilizador vê ao aprovar: o comando/caminho concretos, nunca o conteúdo de ficheiros. */
+export function describeForApproval(tool: string, args: Record<string, unknown>): string {
+  const str = (k: string, max = 1000) => (typeof args[k] === "string" ? String(args[k]).slice(0, max) : "");
+  switch (tool) {
+    case "start_process": return `Executar: ${str("command")}${args.cwd ? `\n(em ${str("cwd", 300)})` : ""}`;
+    case "interact_with_process": return `Enviar ${str("input", 100_000).length} caracteres para a sessão ${str("session_id", 64)}`;
+    case "write_file": return `Escrever ${str("content", 2_000_000).length} caracteres em ${str("path", 500)} (${str("mode", 16) || "overwrite"})`;
+    case "edit_block": return `Editar ${str("path", 500)} (substituir ${str("old", 2_000_000).length} por ${str("new", 2_000_000).length} caracteres)`;
+    case "move_file": return `Mover ${str("source", 500)} → ${str("destination", 500)}`;
+    case "terminate_session": return `Terminar a sessão ${str("session_id", 64)}`;
+    default: return `${tool} ${summarizeArgs(args)}`;
+  }
+}

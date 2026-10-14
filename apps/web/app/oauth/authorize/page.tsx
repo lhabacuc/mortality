@@ -1,5 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
+import { checkCeiling } from "@mortality/shared";
 import { decideConsent } from "@/lib/oauth-actions";
 import { db, schema } from "@/lib/db";
 import { currentUser } from "@/lib/session";
@@ -51,9 +52,9 @@ export default async function Authorize({ searchParams }: { searchParams: Promis
           </fieldset>
           <label>Permissões{" "}
             <select name="preset" defaultValue="read_only">
-              <option value="read_only">Só leitura (listar, ler, pesquisar, info)</option>
-              <option value="read_write">Leitura e escrita</option>
-              <option value="terminal">Terminal (processos; recomenda aprovação humana)</option>
+              {!checkCeiling(user, { preset: "read_only" }) && <option value="read_only">Só leitura (listar, ler, pesquisar, info)</option>}
+              {!checkCeiling(user, { preset: "read_write" }) && <option value="read_write">Leitura e escrita</option>}
+              {!checkCeiling(user, { preset: "terminal" }) && <option value="terminal">Terminal (cada processo exige a tua aprovação)</option>}
             </select>
           </label>
           <label>Duração{" "}
