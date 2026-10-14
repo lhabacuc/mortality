@@ -196,3 +196,7 @@ entre utilizadores e 2FA foram validados com scripts e browser contra Neon real 
   implementado para não incluir código de autenticação sem o poder testar.
 - Notificação (push/email) de aprovações pendentes (o utilizador tem de ter o painel aberto; a janela de aprovação é de 30 s).
 - QR code no setup do TOTP (mostra a chave e o URI `otpauth://`).
+
+## Licença
+
+[MIT](LICENSE) © 2026 lhabacuc

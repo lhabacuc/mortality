@@ -8,5 +8,6 @@
     "db:generate": "pnpm --filter @mortality/web db:generate",
     "db:migrate": "pnpm --filter @mortality/web db:migrate",
     "test": "pnpm --filter @mortality/web test"
-  }
+  },
+  "license": "MIT"
 }

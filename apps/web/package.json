@@ -25,5 +25,6 @@
     "@types/react": "^19.0.0",
     "drizzle-kit": "^0.31.11",
     "typescript": "^5.9.0"
-  }
+  },
+  "license": "MIT"
 }
