@@ -1,6 +1,6 @@
 # Deploy passo a passo (Vercel + Neon)
 
-Conta Vercel usada: scope `42skillars-projects`. Substitui `<PROJETO>` pelo nome escolhido (ex.: `mortality-mcp`).
+Substitui `<SCOPE>` pela tua equipa/conta Vercel (`vercel teams ls`) e `<PROJETO>` pelo nome do projeto (ex.: `mortality-mcp`).
 
 ## 0. Antes de começar
 - [ ] **Roda a password do role no Neon** (Console → Roles → Reset password) se a connection string foi partilhada fora do teu cofre.
@@ -9,23 +9,23 @@ Conta Vercel usada: scope `42skillars-projects`. Substitui `<PROJETO>` pelo nome
 
 ## 1. Criar e ligar o projeto (a partir da raiz do repositório)
 ```bash
-vercel project add <PROJETO> --scope 42skillars-projects
-vercel link --yes --project <PROJETO> --scope 42skillars-projects
+vercel project add <PROJETO> --scope <SCOPE>
+vercel link --yes --project <PROJETO> --scope <SCOPE>
 ```
 
 ## 2. Root Directory = `apps/web` (monorepo pnpm)
 ```bash
 vercel api /v9/projects/<PROJETO> -X PATCH \
   -F rootDirectory=apps/web -F framework=nextjs -F sourceFilesOutsideRootDirectory=true \
-  --scope 42skillars-projects
+  --scope <SCOPE>
 ```
 
 ## 3. Variáveis (Production). Os segredos são pedidos de forma oculta, não ficam no histórico
 ```bash
-openssl rand -base64 48 | vercel env add SESSION_SECRET production --scope 42skillars-projects
-vercel env add DATABASE_URL production --scope 42skillars-projects      # cola a connection string pooled
-printf 'invite_only' | vercel env add SIGNUP_MODE production --scope 42skillars-projects
-printf '1' | vercel env add REQUIRE_ADMIN_TOTP production --scope 42skillars-projects   # opcional
+openssl rand -base64 48 | vercel env add SESSION_SECRET production --scope <SCOPE>
+vercel env add DATABASE_URL production --scope <SCOPE>      # cola a connection string pooled
+printf 'invite_only' | vercel env add SIGNUP_MODE production --scope <SCOPE>
+printf '1' | vercel env add REQUIRE_ADMIN_TOTP production --scope <SCOPE>   # opcional
 ```
 - `APP_URL` é opcional: sem ele usa-se `VERCEL_PROJECT_PRODUCTION_URL` (domínio de produção, https).
   Se usares domínio próprio, define `APP_URL` com ele.
@@ -33,7 +33,7 @@ printf '1' | vercel env add REQUIRE_ADMIN_TOTP production --scope 42skillars-pro
 
 ## 4. Deploy
 ```bash
-vercel deploy --prod --scope 42skillars-projects
+vercel deploy --prod --scope <SCOPE>
 ```
 O `vercel.json` corre `pnpm db:migrate` antes do build (migrações idempotentes).
 
@@ -65,7 +65,7 @@ membro da equipa («commit author doesn't have permission»). O estado fica `UNK
 - fazer o deploy a partir de uma exportação sem metadados git:
 ```bash
 T=$(mktemp -d) && git archive HEAD | tar -x -C $T && mkdir -p $T/.vercel && cp .vercel/project.json $T/.vercel/
-(cd $T && vercel deploy --prod --scope 42skillars-projects --yes)
+(cd $T && vercel deploy --prod --scope <SCOPE> --yes)
 ```
 Diagnóstico: `vercel api /v13/deployments/<id>` → `readyStateReason`.
 

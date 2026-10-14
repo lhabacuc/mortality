@@ -64,6 +64,10 @@ curl -fsSL http://localhost:3000/install | bash
 6. Abre o painel, entra com o admin e troca a password. Depois remove `ADMIN_PASSWORD` das variáveis.
 7. Para um serviço pessoal usa `SIGNUP_MODE=invite_only` e gera convites em *Administração → Convites*.
 
+[![Deploy com a Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Flhabacuc%2Fmortality&root-directory=apps%2Fweb&env=DATABASE_URL%2CSESSION_SECRET&envDescription=Neon%20connection%20string%20%28pooled%29%20e%20um%20segredo%20de%2032%2B%20caracteres&project-name=mortality)
+
+> O botão acima **não foi testado**. O caminho validado é o da CLI em [`DEPLOY.md`](DEPLOY.md).
+
 **Planos (verificado na documentação em 2026-10-14):** Vercel Hobby é **só para uso não comercial**; inclui 1 000 000 invocações
 e 4 h de Active CPU por mês; `maxDuration` até 300 s. Neon Free: 100 CU-h/mês, autosuspend fixo de 5 min.
 
