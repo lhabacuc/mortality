@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { checkPath } from "../policy.ts";
+import { checkPath, isBlocked, type JobPermissions, type Policy } from "../policy.ts";
 import { optInt, optString, reqString, type Tool } from "./util.ts";
 
 const MAX_SEARCHES = 10;
@@ -21,7 +21,7 @@ function mine(id: string, owner: string): Search {
   return s;
 }
 
-async function run(s: Search, root: string, pattern: string, mode: "name" | "content", max: number) {
+async function run(s: Search, root: string, pattern: string, mode: "name" | "content", max: number, perms: JobPermissions, policy: Policy) {
   const needle = pattern.toLowerCase();
   const stack = [root];
   let tick = 0;
@@ -36,6 +36,7 @@ async function run(s: Search, root: string, pattern: string, mode: "name" | "con
         s.scanned++;
         const full = join(dir, e.name);
         if (e.isSymbolicLink()) continue; // nunca segue symlinks
+        if (isBlocked(full, perms, policy)) continue; // bloqueado: nem entra nem lista
         if (e.isDirectory()) { stack.push(full); if (mode === "name" && e.name.toLowerCase().includes(needle)) s.results.push({ path: full, type: "dir" }); continue; }
         if (!e.isFile()) continue;
         if (mode === "name") {
@@ -76,7 +77,7 @@ export const searchTools: Record<string, Tool> = {
     }
     const s: Search = { id: randomUUID(), owner: ctx.clientId, results: [], done: false, stop: false, scanned: 0, startedAt: Date.now() };
     searches.set(s.id, s);
-    void run(s, root, pattern, mode, max);
+    void run(s, root, pattern, mode, max, ctx.permissions, ctx.policy);
     return { search_id: s.id };
   },
 

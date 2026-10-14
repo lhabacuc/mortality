@@ -4,6 +4,10 @@ import { policyPath, ensureConfigDir } from "./config.ts";
 
 export interface Policy {
   allowed_dirs: string[];
+  /** Diretórios sempre vedados neste dispositivo (prevalecem sobre tudo). */
+  blocked_dirs: string[];
+  /** Não restringe por diretório localmente (o servidor continua a limitar). */
+  allow_all_dirs: boolean;
   blocked_commands: string[];
   read_only: boolean;
   max_sessions: number;
@@ -11,16 +15,22 @@ export interface Policy {
   max_job_seconds: number;
 }
 
-export interface JobPermissions { allowedDirs: string[]; blockedCommands: string[]; readOnly: boolean }
+export interface JobPermissions {
+  allowedDirs: string[];
+  blockedDirs?: string[];
+  allowAllDirs?: boolean;
+  blockedCommands: string[];
+  readOnly: boolean;
+}
 
 export const defaultPolicy = (dir: string): Policy => ({
-  allowed_dirs: [dir], blocked_commands: [], read_only: false,
+  allowed_dirs: [dir], blocked_dirs: [], allow_all_dirs: false, blocked_commands: [], read_only: false,
   max_sessions: 5, max_output_bytes: 1_000_000, max_job_seconds: 50,
 });
 
 export function loadPolicy(): Policy {
   // Sem política válida → falha fechada (nada permitido).
-  const closed = { ...defaultPolicy(""), allowed_dirs: [] };
+  const closed = { ...defaultPolicy(""), allowed_dirs: [], blocked_dirs: [], allow_all_dirs: false };
   if (!existsSync(policyPath())) return closed;
   try { return { ...closed, ...JSON.parse(readFileSync(policyPath(), "utf8")) }; } catch { return closed; }
 }
@@ -49,13 +59,25 @@ export function within(base: string, target: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
-/** Permissões efetivas = interseção servidor ∩ política local: tem de caber nas DUAS listas. */
+const inAny = (dirs: string[], real: string) => dirs.some((d) => d && within(realResolve(d), real));
+
+/** Caminho (já resolvido por `realpath`) dentro de um diretório bloqueado, no servidor ou localmente. */
+export function isBlocked(target: string, perms: JobPermissions, policy: Policy): boolean {
+  const real = realResolve(target);
+  return inAny(perms.blockedDirs ?? [], real) || inAny(policy.blocked_dirs ?? [], real);
+}
+
+/**
+ * Permissões efetivas = interseção servidor ∩ política local, e o BLOQUEIO vence sempre.
+ * `realpath` impede que um symlink num diretório permitido aponte para um bloqueado.
+ */
 export function checkPath(target: string, perms: JobPermissions, policy: Policy): string {
   if (!isAbsolute(target)) throw new Error("Caminho tem de ser absoluto.");
   const real = realResolve(target);
-  const ok = (dirs: string[]) => dirs.some((d) => d && within(realResolve(d), real));
-  if (!ok(perms.allowedDirs)) throw new Error("Caminho fora dos diretórios permitidos pelo servidor.");
-  if (!ok(policy.allowed_dirs)) throw new Error("Caminho fora da política local.");
+  if (inAny(perms.blockedDirs ?? [], real)) throw new Error("Caminho bloqueado pelo servidor.");
+  if (inAny(policy.blocked_dirs ?? [], real)) throw new Error("Caminho bloqueado pela política local.");
+  if (!perms.allowAllDirs && !inAny(perms.allowedDirs, real)) throw new Error("Caminho fora dos diretórios permitidos pelo servidor.");
+  if (!policy.allow_all_dirs && !inAny(policy.allowed_dirs, real)) throw new Error("Caminho fora da política local.");
   return real;
 }
 

@@ -3,6 +3,9 @@ import { db, schema } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
 import { createPat, revokePat } from "@/lib/panel-actions";
 import { PanelForm } from "../panel-form";
+import { DirFields } from "../dir-fields";
+import { SudoConfirm } from "../grant-fields";
+import { checkCeiling } from "@mortality/shared";
 import { ConfirmButton } from "@/components/confirm-button";
 import { ago, until } from "@/lib/format";
 
@@ -25,12 +28,14 @@ export default async function Tokens() {
             <option value="read_only">Só leitura</option>
             <option value="read_write">Leitura e escrita</option>
             <option value="terminal">Terminal</option>
+            {!checkCeiling(user, { preset: "sudo_for_all" }) && <option value="sudo_for_all">sudo-for-all (acesso total)</option>}
           </select>
           <select name="duration" defaultValue="24h">
             <option value="1h">1 hora</option><option value="24h">24 horas</option>
             <option value="30d">30 dias</option><option value="never">Até revogar</option>
           </select>
-          <textarea name="dirs" rows={3} placeholder={"Diretórios permitidos (um por linha)\n/home/user/projeto"} required />
+          <DirFields allowAllOk={user.allowAllDirsOk} />
+          {!checkCeiling(user, { preset: "sudo_for_all" }) && <SudoConfirm />}
         </PanelForm>
       )}
       <h2>Ativos</h2>

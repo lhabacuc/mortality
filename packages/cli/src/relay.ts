@@ -1,12 +1,12 @@
 import { appendFileSync } from "node:fs";
 import { arch, platform } from "node:os";
 import { VERSION, isPaused, loadDevice } from "./config.ts";
-import { loadPolicy } from "./policy.ts";
+import { loadPolicy, type JobPermissions } from "./policy.ts";
 import { backend, logFile } from "./service.ts";
 import { tools } from "./tools/index.ts";
 import { killAllSessions } from "./tools/process.ts";
 
-interface Job { id: string; clientId: string; tool: string; args: Record<string, unknown>; permissions: { allowedDirs: string[]; blockedCommands: string[]; readOnly: boolean } }
+interface Job { id: string; clientId: string; tool: string; args: Record<string, unknown>; permissions: JobPermissions }
 
 const sleep = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
 // Nunca regista tokens nem conteúdo. Em Windows (sem journald) também grava em ficheiro.

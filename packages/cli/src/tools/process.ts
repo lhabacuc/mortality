@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { homedir } from "node:os";
 import { checkPath, commandBlocked } from "../policy.ts";
 import { assertWritable, optInt, optString, reqString, type Tool, type ToolContext } from "./util.ts";
 
@@ -63,7 +64,7 @@ export const processTools: Record<string, Tool> = {
     if (live >= ctx.policy.max_sessions) throw new Error(`Limite de ${ctx.policy.max_sessions} sessões atingido.`);
 
     const cwdArg = optString(a, "cwd");
-    const cwd = checkPath(cwdArg ?? ctx.policy.allowed_dirs[0] ?? "", ctx.permissions, ctx.policy);
+    const cwd = checkPath(cwdArg ?? ctx.policy.allowed_dirs[0] ?? homedir(), ctx.permissions, ctx.policy);
     const ttl = optInt(a, "timeout_seconds", 1, 3600, 3600);
 
     const win = process.platform === "win32";

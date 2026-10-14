@@ -1,5 +1,5 @@
 import { VERSION } from "../config.ts";
-import { checkPath } from "../policy.ts";
+import { checkPath, isBlocked } from "../policy.ts";
 import { readdirSync, statSync, lstatSync } from "node:fs";
 import { join } from "node:path";
 import { fsTools } from "./fs.ts";
@@ -19,7 +19,8 @@ export const tools: Record<string, Tool> = {
   list_directory(args, ctx) {
     const dir = checkPath(reqString(args, "path"), ctx.permissions, ctx.policy);
     if (!statSync(dir).isDirectory()) throw new Error("Não é um diretório.");
-    const names = readdirSync(dir).sort();
+    // Não revela nomes que seriam bloqueados.
+    const names = readdirSync(dir).filter((n) => !isBlocked(join(dir, n), ctx.permissions, ctx.policy)).sort();
     const entries = names.slice(0, MAX_ENTRIES).map((name) => {
       try {
         const s = lstatSync(join(dir, name));

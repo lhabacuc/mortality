@@ -118,7 +118,7 @@ Reiniciar o serviço mata as sessões de processo em curso.
 
 ```
 mortality install [--server URL] mortality status [--json]   mortality logs [-f]
-mortality pause | resume         mortality restart           mortality policy show|edit
+mortality pause | resume         mortality restart           mortality policy show|edit|allow-all|block|unblock
 mortality uninstall              mortality run [--service]
 ```
 
@@ -153,6 +153,20 @@ Fluxo real contra a Vercel + Neon, com um relay num PC Linux e o preset **só le
 
 **Ainda não validado com o ChatGPT:** presets de escrita/terminal, aprovações humanas, refresh do token após 1 h e planos
 diferentes do usado (o acesso a conectores personalizados depende do plano/workspace).
+
+## Permissões
+
+| Preset | Inclui |
+|---|---|
+| Só leitura | listar, ler, pesquisar, informação do sistema |
+| Leitura e escrita | + escrever, editar, criar pastas, mover |
+| Terminal | + processos (por defeito com aprovação humana em `start_process`) |
+| **sudo-for-all** | **todas as ferramentas e o terminal, sem aprovações**. Exige confirmação explícita, dura no máximo 24 h e o admin tem de elevar o teto do utilizador (por defeito desligado) |
+
+- **Todos os diretórios** é opt-in por grant; continua limitado pela política local do dispositivo (`mortality policy allow-all on`).
+- **Diretórios bloqueados** prevalecem sobre tudo, no servidor **e** no relay (com `realpath`: um symlink não os contorna).
+  Aplicam-se às ferramentas de ficheiros e pesquisa; um comando de terminal **não** é limitado por diretório (guardrail, não sandbox).
+- Um relay anterior à 0.3.0 não impõe bloqueios: o servidor recusa grants com diretórios bloqueados para esse dispositivo.
 
 ## Variáveis de ambiente
 

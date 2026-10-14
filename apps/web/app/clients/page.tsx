@@ -8,7 +8,7 @@ import { GrantFields } from "../grant-fields";
 import { ConfirmButton } from "@/components/confirm-button";
 
 const PRESET: Record<string, string> = {
-  read_only: "Só leitura", read_write: "Leitura e escrita", terminal: "Terminal", custom: "Personalizado",
+  read_only: "Só leitura", read_write: "Leitura e escrita", terminal: "Terminal", sudo_for_all: "sudo-for-all", custom: "Personalizado",
 };
 
 export default async function Clients() {
@@ -68,12 +68,12 @@ export default async function Clients() {
                 <details key={g.id}>
                   <summary>
                     <strong>{devName.get(g.deviceId) ?? "?"}</strong> — {PRESET[g.preset]}
-                    {g.readOnly && " · só leitura"} · <span className={expired ? "alert" : "muted"}>{until(g.expiresAt)}</span>
+                    {g.readOnly && " · só leitura"}{g.allowAllDirs && " · todos os diretórios"}{g.blockedDirs.length > 0 && ` · ${g.blockedDirs.length} bloqueado${g.blockedDirs.length > 1 ? "s" : ""}`} · <span className={expired ? "alert" : "muted"}>{until(g.expiresAt)}</span>
                   </summary>
                   <PanelForm action={updateGrant} submit="Guardar alterações">
                     <input type="hidden" name="grantId" value={g.id} />
-                    <GrantFields keepDuration d={{
-                      preset: g.preset, dirs: g.allowedDirs, blocked: g.blockedCommands, readOnly: g.readOnly,
+                    <GrantFields keepDuration allowAllOk={user.allowAllDirsOk} d={{
+                      preset: g.preset, dirs: g.allowedDirs, blockedDirs: g.blockedDirs, allowAll: g.allowAllDirs, blocked: g.blockedCommands, readOnly: g.readOnly,
                       tools: g.allowedTools, approve: g.requireApprovalFor,
                     }} />
                   </PanelForm>
@@ -89,7 +89,7 @@ export default async function Clients() {
                 <PanelForm action={addGrant} submit="Conceder acesso">
                   <input type="hidden" name="clientId" value={t.key} />
                   <select name="deviceId" required>{free.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
-                  <GrantFields />
+                  <GrantFields allowAllOk={user.allowAllDirsOk} />
                 </PanelForm>
               </details>
             )}

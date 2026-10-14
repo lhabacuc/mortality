@@ -4,6 +4,8 @@ import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { parseDirFields } from "./dirs";
+import { checkSudo } from "./sudo";
 import { checkCeiling } from "@mortality/shared";
 import { count } from "drizzle-orm";
 import { db, schema } from "./db";
@@ -72,9 +74,9 @@ const DURATIONS: Record<string, number | null> = { "1h": 3600, "24h": 86400, "30
 const CreatePat = z.object({
   name: z.string().trim().min(1).max(60),
   deviceId: z.string().uuid(),
-  preset: z.enum(["read_only", "read_write", "terminal"]),
+  preset: z.enum(["read_only", "read_write", "terminal", "sudo_for_all"]),
   duration: z.enum(["1h", "24h", "30d", "never"]),
-  dirs: z.string().max(4000),
+  dirs: z.string().max(4000).optional().default(""),
 });
 
 /** PAT nasce sem acesso: o grant (cliente × dispositivo) é criado no mesmo passo. */
@@ -82,12 +84,12 @@ export async function createPat(_: PanelState, form: FormData): Promise<PanelSta
   const user = await requireUser();
   const p = CreatePat.safeParse(Object.fromEntries(form));
   if (!p.success) return { error: "Preenche todos os campos." };
-  const dirs = p.data.dirs.split("\n").map((d) => d.trim()).filter(Boolean);
-  if (!dirs.length || dirs.some((d) => !/^([/~]|[a-zA-Z]:[\\/])/.test(d))) {
-    return { error: "Indica pelo menos um diretório absoluto permitido (um por linha)." };
-  }
+  const dirs = parseDirFields(form, user.allowAllDirsOk);
+  if ("error" in dirs) return { error: dirs.error };
   const over = checkCeiling(user, { preset: p.data.preset });
   if (over) return { error: over };
+  const sudoErr = checkSudo(p.data.preset, p.data.duration, form);
+  if (sudoErr) return { error: sudoErr };
   const [device] = await db().select({ id: schema.devices.id }).from(schema.devices)
     .where(and(eq(schema.devices.id, p.data.deviceId), eq(schema.devices.userId, user.id), isNull(schema.devices.revokedAt))).limit(1);
   if (!device) return { error: "Dispositivo inválido." };
@@ -100,7 +102,7 @@ export async function createPat(_: PanelState, form: FormData): Promise<PanelSta
   }).returning({ id: schema.accessTokens.id });
   await db().insert(schema.clientGrants).values({
     userId: user.id, clientId: tok.id, deviceId: device.id, preset: p.data.preset,
-    allowedDirs: dirs, requireApprovalFor: p.data.preset === "terminal" ? ["start_process"] : [], expiresAt,
+    ...dirs.value, requireApprovalFor: p.data.preset === "terminal" ? ["start_process"] : [], expiresAt,
   });
   await audit({ userId: user.id, deviceId: device.id, clientId: tok.id, actor: "user", action: "pat.create", argsSummary: `${p.data.name} ${p.data.preset}` });
   revalidatePath("/tokens");

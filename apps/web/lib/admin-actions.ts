@@ -40,13 +40,14 @@ export async function setLimits(_: PanelState, form: FormData): Promise<PanelSta
   const admin = await requireAdmin();
   const p = z.object({
     userId: Uuid,
-    maxPreset: z.enum(["read_only", "read_write", "terminal"]),
+    maxPreset: z.enum(["read_only", "read_write", "terminal", "sudo_for_all"]),
     maxDevices: z.coerce.number().int().min(0).max(100),
   }).safeParse(Object.fromEntries(form));
   if (!p.success) return { error: "Valores inválidos." };
   const disabled = form.getAll("disabled").map(String).filter((t) => ALL_TOOLS.includes(t));
+  const allowAllDirsOk = form.get("allowAllDirsOk") === "on";
   await db().update(schema.users).set({
-    maxPreset: p.data.maxPreset, maxDevices: p.data.maxDevices, disabledTools: disabled,
+    maxPreset: p.data.maxPreset, maxDevices: p.data.maxDevices, disabledTools: disabled, allowAllDirsOk,
   }).where(eq(schema.users.id, p.data.userId));
   await audit({ userId: p.data.userId, actor: "admin", action: "admin.limits", argsSummary: `${p.data.maxPreset} dev<=${p.data.maxDevices} off=${disabled.length} by ${admin.email}` });
   revalidatePath(`/admin/users/${p.data.userId}`);

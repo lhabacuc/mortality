@@ -2,6 +2,8 @@ import { and, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { checkCeiling } from "@mortality/shared";
 import { decideConsent } from "@/lib/oauth-actions";
+import { DirFields } from "../../dir-fields";
+import { SudoConfirm } from "../../grant-fields";
 import { db, schema } from "@/lib/db";
 import { currentUser } from "@/lib/session";
 import { validateAuthRequest, redirectWith } from "@/lib/oauth-request";
@@ -56,6 +58,7 @@ export default async function Authorize({ searchParams }: { searchParams: Promis
               {!checkCeiling(user, { preset: "read_only" }) && <option value="read_only">Só leitura (listar, ler, pesquisar, info)</option>}
               {!checkCeiling(user, { preset: "read_write" }) && <option value="read_write">Leitura e escrita</option>}
               {!checkCeiling(user, { preset: "terminal" }) && <option value="terminal">Terminal (cada processo exige a tua aprovação)</option>}
+              {!checkCeiling(user, { preset: "sudo_for_all" }) && <option value="sudo_for_all">sudo-for-all (acesso total, sem pedir permissão)</option>}
             </select>
           </label>
           <label>Duração{" "}
@@ -64,9 +67,8 @@ export default async function Authorize({ searchParams }: { searchParams: Promis
               <option value="30d">30 dias</option><option value="never">Até revogar</option>
             </select>
           </label>
-          <label>Diretórios permitidos (um por linha)
-            <textarea name="dirs" rows={3} required placeholder="/home/user/projeto" />
-          </label>
+          <DirFields allowAllOk={user.allowAllDirsOk} />
+          {!checkCeiling(user, { preset: "sudo_for_all" }) && <SudoConfirm />}
           <div>
             <div className="row">
             <button name="decision" value="approve" className="primary">Autorizar</button>

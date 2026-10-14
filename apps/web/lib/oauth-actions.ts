@@ -6,6 +6,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { checkCeiling } from "@mortality/shared";
+import { parseDirFields } from "./dirs";
+import { checkSudo } from "./sudo";
 import { appUrl } from "./app-url";
 import { audit } from "./audit";
 import { db, schema } from "./db";
@@ -40,17 +42,17 @@ export async function decideConsent(form: FormData) {
   };
 
   const p = z.object({
-    preset: z.enum(["read_only", "read_write", "terminal"]),
+    preset: z.enum(["read_only", "read_write", "terminal", "sudo_for_all"]),
     duration: z.enum(["1h", "24h", "30d", "never"]),
-    dirs: z.string().max(4000),
+    dirs: z.string().max(4000).optional().default(""),
   }).safeParse(Object.fromEntries(form));
   const deviceIds = form.getAll("devices").map(String);
-  const dirs = p.success ? p.data.dirs.split("\n").map((d) => d.trim()).filter(Boolean).slice(0, 20) : [];
-  if (!p.success || !deviceIds.length || !dirs.length || dirs.some((d) => !/^([/~]|[a-zA-Z]:[\\/])/.test(d))) {
+  const dirs = parseDirFields(form, user.allowAllDirsOk);
+  if (!p.success || !deviceIds.length || "error" in dirs) {
     redirect(`${back()}&form_error=1`);
   }
 
-  if (checkCeiling(user, { preset: p.data.preset })) redirect(`${back()}&form_error=1`);
+  if (checkCeiling(user, { preset: p.data.preset }) || checkSudo(p.data.preset, p.data.duration, form)) redirect(`${back()}&form_error=1`);
   const devs = await db().select({ id: schema.devices.id }).from(schema.devices).where(and(
     eq(schema.devices.userId, user.id), isNull(schema.devices.revokedAt), inArray(schema.devices.id, deviceIds)));
   if (!devs.length) redirect(`${back()}&form_error=1`);
@@ -62,7 +64,7 @@ export async function decideConsent(form: FormData) {
   await revokeClientForUser(user.id, ok.clientId);
   await db().insert(schema.clientGrants).values(devs.map((d) => ({
     userId: user.id, clientId: ok.clientId, deviceId: d.id, preset: p.data.preset,
-    allowedDirs: dirs, requireApprovalFor: p.data.preset === "terminal" ? ["start_process"] : [], expiresAt,
+    ...dirs.value, requireApprovalFor: p.data.preset === "terminal" ? ["start_process"] : [], expiresAt,
   })));
 
   const code = `mac_${randomBytes(32).toString("base64url")}`;

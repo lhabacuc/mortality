@@ -49,9 +49,10 @@ export default async function AdminUser({ params }: { params: Promise<{ id: stri
         <input type="hidden" name="userId" value={u.id} />
         <label>Preset máximo{" "}
           <select name="maxPreset" defaultValue={u.maxPreset}>
-            <option value="read_only">Só leitura</option><option value="read_write">Leitura e escrita</option><option value="terminal">Terminal</option>
+            <option value="read_only">Só leitura</option><option value="read_write">Leitura e escrita</option><option value="terminal">Terminal</option><option value="sudo_for_all">sudo-for-all (acesso total, sem aprovações)</option>
           </select>
         </label>
+        <label><input type="checkbox" name="allowAllDirsOk" defaultChecked={u.allowAllDirsOk} /> Pode conceder «todos os diretórios»</label>
         <label>Máx. dispositivos <input name="maxDevices" type="number" min={0} max={100} defaultValue={u.maxDevices} /></label>
         <fieldset>
           <legend>Tools proibidas</legend>

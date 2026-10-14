@@ -70,7 +70,9 @@ export default function Guide() {
         ["mortality pause", "Pausa local imediata: o relay deixa de executar jobs (funciona offline)"],
         ["mortality resume", "Retoma"],
         ["mortality restart", "Reinicia o serviço (termina as sessões de processo em curso)"],
-        ["mortality policy show | edit", "Vê/edita a política local (só pode restringir)"],
+        ["mortality policy show | edit", "Vê/edita a política local"],
+        ["mortality policy block DIR | unblock DIR", "Bloqueia/desbloqueia um diretório neste dispositivo (prevalece sempre)"],
+        ["mortality policy allow-all on|off", "Permite/restringe todos os diretórios localmente (o servidor continua a limitar)"],
         ["mortality uninstall", "Revoga o dispositivo no servidor, remove o serviço e apaga a configuração"],
         ["mortality run [--service]", "Corre em primeiro plano (debug)"],
       ]} />
@@ -92,10 +94,13 @@ export default function Guide() {
         ["Só leitura", "listar, ler, pesquisar, informação do sistema", "Começar aqui. Mais seguro."],
         ["Leitura e escrita", "+ escrever, editar, criar pastas, mover", "Tarefas que alteram ficheiros."],
         ["Terminal", "+ iniciar e controlar processos", "Só com aprovação humana e duração curta."],
+        ["sudo-for-all", "todas as ferramentas e o terminal, sem pedir permissão", "Acesso total. Exige confirmação, dura no máximo 24 h e o admin tem de o permitir."],
         ["Personalizado", "tools à escolha", "Casos específicos."],
       ]} />
       <ul>
         <li><strong>Diretórios permitidos:</strong> o cliente só toca nestas pastas (symlinks e <code>..</code> são resolvidos).</li>
+        <li><strong>Todos os diretórios:</strong> opção explícita; o cliente alcança qualquer pasta que o utilizador do relay alcance. Também tens de a permitir no dispositivo: <code>mortality policy allow-all on</code>.</li>
+        <li><strong>Diretórios bloqueados:</strong> prevalecem sobre tudo (inclusive «todos os diretórios» e o sudo-for-all). Valem para as ferramentas de ficheiros e pesquisa; um comando de terminal não é limitado por diretório (guardrail, não sandbox). No dispositivo: <code>mortality policy block /caminho</code>.</li>
         <li><strong>Comandos bloqueados:</strong> lista de comandos recusados no terminal (guardrail, não sandbox).</li>
         <li><strong>Duração:</strong> 1 h, 24 h, 30 dias ou até revogar. Prefere curtas.</li>
         <li><strong>Política local:</strong> o ficheiro <code>~/.config/mortality/policy.json</code> só pode <em>restringir</em>; o servidor nunca o alarga.</li>

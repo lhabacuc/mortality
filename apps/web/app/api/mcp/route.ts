@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { commandBlocked, isWithin } from "@mortality/shared";
+import { commandBlocked, pathAllowed } from "@mortality/shared";
 import { audit } from "@/lib/audit";
 import { baseUrl, preflight, withCors } from "@/lib/cors";
 import { canonicalResource } from "@/lib/oauth";
@@ -32,7 +32,8 @@ async function buildServer(ctx: McpContext, ip: string) {
         ...(def.pathLists ?? []).flatMap((k) => (Array.isArray(args[k]) ? (args[k] as string[]) : [])),
       ];
       for (const p of paths) {
-        if (!g.permissions.allowedDirs.some((d) => isWithin(d, p))) throw new AccessError("Caminho fora dos diretórios permitidos.");
+        const r = pathAllowed(g.permissions, p);
+        if (!r.ok) throw new AccessError(r.reason === "blocked" ? "Caminho bloqueado." : "Caminho fora dos diretórios permitidos.");
       }
       if (tool === "start_process") {
         const hit = commandBlocked(String(args.command), g.permissions.blockedCommands);

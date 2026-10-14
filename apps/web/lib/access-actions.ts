@@ -10,6 +10,8 @@ import { requireUser } from "./guard";
 import type { PanelState } from "./panel-actions";
 import { revokeClientForUser } from "./oauth-tokens";
 import { validRedirectUri } from "./oauth";
+import { parseDirFields } from "./dirs";
+import { checkSudo } from "./sudo";
 import { allow } from "./ratelimit";
 import { newSecret, sha256 } from "./tokens";
 import { randomUUID } from "node:crypto";
@@ -19,26 +21,24 @@ const lines = (v: FormDataEntryValue | null) =>
   String(v ?? "").split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 50);
 
 const GrantFields = z.object({
-  preset: z.enum(["read_only", "read_write", "terminal", "custom"]),
+  preset: z.enum(["read_only", "read_write", "terminal", "sudo_for_all", "custom"]),
   duration: z.enum(["keep", "1h", "24h", "30d", "never"]),
 });
 
-function parseGrant(form: FormData) {
+function parseGrant(form: FormData, allowAllOk: boolean) {
   const base = GrantFields.safeParse(Object.fromEntries(form));
   if (!base.success) return { error: "Dados inválidos." } as const;
-  const dirs = lines(form.get("dirs"));
-  if (!dirs.length || dirs.some((d) => d.length > 1024 || !/^([/~]|[a-zA-Z]:[\\/])/.test(d))) {
-    return { error: "Indica pelo menos um diretório absoluto permitido (um por linha)." } as const;
-  }
+  const dirsParsed = parseDirFields(form, allowAllOk);
+  if ("error" in dirsParsed) return { error: dirsParsed.error } as const;
   const tools = form.getAll("tools").map(String).filter((t) => ALL_TOOLS.includes(t));
   if (base.data.preset === "custom" && !tools.length) return { error: "Escolhe pelo menos uma tool." } as const;
   return {
     value: {
-      preset: base.data.preset, duration: base.data.duration, allowedDirs: dirs,
+      preset: base.data.preset, duration: base.data.duration, ...dirsParsed.value,
       blockedCommands: lines(form.get("blocked")).map((b) => b.slice(0, 100)),
       readOnly: form.get("readOnly") === "on",
       allowedTools: base.data.preset === "custom" ? tools : [],
-      requireApprovalFor: form.getAll("approve").map(String).filter((t) => ALL_TOOLS.includes(t)),
+      requireApprovalFor: base.data.preset === "sudo_for_all" ? [] : form.getAll("approve").map(String).filter((t) => ALL_TOOLS.includes(t)),
     },
   } as const;
 }
@@ -49,13 +49,15 @@ export async function updateGrant(_: PanelState, form: FormData): Promise<PanelS
   const user = await requireUser();
   const id = z.string().uuid().safeParse(form.get("grantId"));
   if (!id.success) return { error: "Grant inválido." };
-  const g = parseGrant(form);
+  const g = parseGrant(form, user.allowAllDirsOk);
   if ("error" in g) return { error: g.error };
   const over = checkCeiling(user, { preset: g.value.preset, tools: g.value.allowedTools });
   if (over) return { error: over };
+  const sudoErr = checkSudo(g.value.preset, g.value.duration, form);
+  if (sudoErr) return { error: sudoErr };
   const exp = expiry(g.value.duration);
   const res = await db().update(schema.clientGrants).set({
-    preset: g.value.preset, allowedDirs: g.value.allowedDirs, blockedCommands: g.value.blockedCommands,
+    preset: g.value.preset, allowedDirs: g.value.allowedDirs, blockedDirs: g.value.blockedDirs, allowAllDirs: g.value.allowAllDirs, blockedCommands: g.value.blockedCommands,
     readOnly: g.value.readOnly, allowedTools: g.value.allowedTools, requireApprovalFor: g.value.requireApprovalFor,
     ...(exp === undefined ? {} : { expiresAt: exp }),
   }).where(and(eq(schema.clientGrants.id, id.data), eq(schema.clientGrants.userId, user.id), isNull(schema.clientGrants.revokedAt)))
@@ -70,10 +72,12 @@ export async function addGrant(_: PanelState, form: FormData): Promise<PanelStat
   const user = await requireUser();
   const ids = z.object({ clientId: z.string().min(1).max(100), deviceId: z.string().uuid() }).safeParse(Object.fromEntries(form));
   if (!ids.success) return { error: "Dados inválidos." };
-  const g = parseGrant(form);
+  const g = parseGrant(form, user.allowAllDirsOk);
   if ("error" in g) return { error: g.error };
   const over = checkCeiling(user, { preset: g.value.preset, tools: g.value.allowedTools });
   if (over) return { error: over };
+  const sudoErr = checkSudo(g.value.preset, g.value.duration, form);
+  if (sudoErr) return { error: sudoErr };
 
   // O cliente tem de ser um PAT do utilizador ou um cliente OAuth ao qual ele já deu acesso.
   const isUuid = z.string().uuid().safeParse(ids.data.clientId).success;
@@ -92,7 +96,8 @@ export async function addGrant(_: PanelState, form: FormData): Promise<PanelStat
   const exp = expiry(g.value.duration);
   const inserted = await db().insert(schema.clientGrants).values({
     userId: user.id, clientId: tok.id, deviceId: dev.id, preset: g.value.preset,
-    allowedDirs: g.value.allowedDirs, blockedCommands: g.value.blockedCommands, readOnly: g.value.readOnly,
+    allowedDirs: g.value.allowedDirs, blockedDirs: g.value.blockedDirs, allowAllDirs: g.value.allowAllDirs,
+    blockedCommands: g.value.blockedCommands, readOnly: g.value.readOnly,
     allowedTools: g.value.allowedTools, requireApprovalFor: g.value.requireApprovalFor, expiresAt: exp ?? null,
   }).onConflictDoNothing().returning({ id: schema.clientGrants.id });
   if (!inserted.length) return { error: "Este cliente já tem acesso a esse dispositivo." };

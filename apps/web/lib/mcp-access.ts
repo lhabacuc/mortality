@@ -1,5 +1,5 @@
 import { and, eq, isNull, or, gt } from "drizzle-orm";
-import { ONLINE_THRESHOLD_MS, ceilingTools, toolsForPreset, type EffectivePermissions, type Preset } from "@mortality/shared";
+import { MIN_RELAY_BLOCKED_DIRS, ONLINE_THRESHOLD_MS, ceilingTools, versionAtLeast, toolsForPreset, type EffectivePermissions, type Preset } from "@mortality/shared";
 import { db, schema } from "./db";
 import { bearer, sha256 } from "./tokens";
 
@@ -48,7 +48,7 @@ export interface ActiveGrant {
 /** Grants ativos do cliente (deny-by-default: sem linha = sem acesso). */
 export async function activeGrants(ctx: McpContext): Promise<ActiveGrant[]> {
   const now = new Date();
-  const [owner] = await db().select({ maxPreset: schema.users.maxPreset, disabledTools: schema.users.disabledTools })
+  const [owner] = await db().select({ maxPreset: schema.users.maxPreset, disabledTools: schema.users.disabledTools, allowAllDirsOk: schema.users.allowAllDirsOk })
     .from(schema.users).where(eq(schema.users.id, ctx.userId)).limit(1);
   if (!owner) return [];
   const cap = ceilingTools(owner.maxPreset, owner.disabledTools);
@@ -69,8 +69,14 @@ export async function activeGrants(ctx: McpContext): Promise<ActiveGrant[]> {
     const tools = raw.filter((t) => cap.includes(t));
     return {
       grantId: g.id, device: d, tools: g.readOnly ? tools.filter((t) => toolsForPreset("read_only").includes(t)) : tools,
-      permissions: { allowedDirs: g.allowedDirs, blockedCommands: g.blockedCommands, readOnly: g.readOnly },
-      requireApprovalFor: g.requireApprovalFor, expiresAt: g.expiresAt,
+      permissions: {
+        allowedDirs: g.allowedDirs, blockedDirs: g.blockedDirs,
+        // O teto do admin aplica-se também a grants já existentes.
+        allowAllDirs: g.allowAllDirs && owner.allowAllDirsOk,
+        blockedCommands: g.blockedCommands, readOnly: g.readOnly,
+      },
+      // sudo-for-all = «sem pedir permissão»: nunca exige aprovação humana.
+      requireApprovalFor: preset === "sudo_for_all" ? [] : g.requireApprovalFor, expiresAt: g.expiresAt,
     };
   });
 }
@@ -92,6 +98,10 @@ export function resolveDevice(grants: ActiveGrant[], tool: string, deviceArg?: s
   if (g.device.pausedLocally) throw new AccessError("Dispositivo pausado localmente.");
   if (!g.device.lastSeenAt || Date.now() - g.device.lastSeenAt.getTime() > ONLINE_THRESHOLD_MS) {
     throw new AccessError("Dispositivo offline.");
+  }
+  // Relays antigos ignoravam `blockedDirs`: nunca correr com bloqueios que não seriam impostos.
+  if (g.permissions.blockedDirs.length && !versionAtLeast(g.device.relayVersion, MIN_RELAY_BLOCKED_DIRS)) {
+    throw new AccessError(`O relay deste dispositivo é antigo (${g.device.relayVersion ?? "?"}) e não impõe diretórios bloqueados. Atualiza para ${MIN_RELAY_BLOCKED_DIRS} ou superior.`);
   }
   return g;
 }

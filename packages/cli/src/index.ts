@@ -3,6 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { realpathSync, rmSync, readFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { arch, hostname, platform } from "node:os";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   VERSION, configDir, isPaused, loadDevice, policyPath, saveDevice, setPaused,
@@ -20,6 +21,8 @@ const HELP = `mortality ${VERSION} — relay local (sem acesso a ferramentas; tu
   mortality pause | resume
   mortality restart
   mortality policy show|edit
+  mortality policy allow-all on|off      (todos os diretórios; o bloqueio continua a prevalecer)
+  mortality policy block DIR | unblock DIR | blocked
   mortality uninstall
   mortality run [--service]
 `;
@@ -94,7 +97,7 @@ async function status(json: boolean) {
     service: backend().isActive(), paused: isPaused(), policy: loadPolicy(),
   };
   if (json) return console.log(JSON.stringify(s, null, 2));
-  console.log(`Dispositivo: ${s.device ?? "(não emparelhado)"}\nServidor:    ${s.server ?? "-"}\nServiço:     ${s.service}\nPausa local: ${s.paused ? "sim" : "não"}\nDiretórios:  ${s.policy.allowed_dirs.join(", ") || "(nenhum)"}\nSó leitura:  ${s.policy.read_only}`);
+  console.log(`Dispositivo: ${s.device ?? "(não emparelhado)"}\nServidor:    ${s.server ?? "-"}\nServiço:     ${s.service}\nPausa local: ${s.paused ? "sim" : "não"}\nDiretórios:  ${s.policy.allow_all_dirs ? "todos" : (s.policy.allowed_dirs.join(", ") || "(nenhum)")}${(s.policy.blocked_dirs ?? []).length ? `\nBloqueados:  ${s.policy.blocked_dirs.join(", ")}` : ""}\nSó leitura:  ${s.policy.read_only}`);
 }
 
 async function uninstall() {
@@ -129,6 +132,21 @@ switch (cmd) {
       spawnSync(process.env.EDITOR || "nano", [policyPath()], { stdio: "inherit" });
       try { JSON.parse(readFileSync(policyPath(), "utf8")); console.log("Política guardada."); }
       catch { die("JSON inválido: a política local passa a negar tudo até ser corrigida."); }
+    } else if (rest[0] === "allow-all") {
+      if (rest[1] !== "on" && rest[1] !== "off") die("Uso: mortality policy allow-all on|off");
+      const p = loadPolicy(); p.allow_all_dirs = rest[1] === "on"; savePolicy(p);
+      console.log(p.allow_all_dirs
+        ? "Todos os diretórios permitidos localmente. O servidor e os diretórios bloqueados continuam a limitar."
+        : "Voltou a restringir aos diretórios permitidos.");
+    } else if (rest[0] === "block" || rest[0] === "unblock") {
+      if (!rest[1]) die(`Uso: mortality policy ${rest[0]} /caminho/absoluto`);
+      const dir = resolve(rest[1]);
+      const p = loadPolicy(); const cur = new Set(p.blocked_dirs ?? []);
+      if (rest[0] === "block") cur.add(dir); else cur.delete(dir);
+      p.blocked_dirs = [...cur]; savePolicy(p);
+      console.log(rest[0] === "block" ? `Bloqueado: ${dir}` : `Desbloqueado: ${dir}`);
+    } else if (rest[0] === "blocked") {
+      console.log((loadPolicy().blocked_dirs ?? []).join("\n") || "(nenhum)");
     } else die(HELP);
     break;
   case "uninstall": await uninstall(); break;

@@ -7,7 +7,7 @@ export type Role = z.infer<typeof Role>;
 export type UserStatus = z.infer<typeof UserStatus>;
 
 // ── Permissões ────────────────────────────────────────────────────────────
-export const Preset = z.enum(["read_only", "read_write", "terminal", "custom"]);
+export const Preset = z.enum(["read_only", "read_write", "terminal", "sudo_for_all", "custom"]);
 export type Preset = z.infer<typeof Preset>;
 
 const READ = ["list_devices", "whoami", "ping_device", "read_file", "read_multiple_files",
@@ -26,6 +26,8 @@ export function toolsForPreset(preset: Preset): string[] {
     case "read_only": return [...READ];
     case "read_write": return [...READ, ...WRITE];
     case "terminal": return [...READ, ...WRITE, ...TERMINAL];
+    // Acesso total: todas as tools, sem aprovações (ver SUDO_PRESET em activeGrants).
+    case "sudo_for_all": return [...ALL_TOOLS];
     default: return [];
   }
 }
@@ -33,6 +35,10 @@ export function toolsForPreset(preset: Preset): string[] {
 /** Permissões efetivas enviadas dentro de cada job; o relay revalida e cruza com a política local. */
 export interface EffectivePermissions {
   allowedDirs: string[];
+  /** Diretórios sempre vedados; prevalecem sobre `allowedDirs` e `allowAllDirs`. */
+  blockedDirs: string[];
+  /** Todos os diretórios (ainda limitado pela política local do dispositivo). */
+  allowAllDirs: boolean;
   blockedCommands: string[];
   readOnly: boolean;
 }
@@ -84,7 +90,10 @@ export function commandBlocked(command: string, blocked: string[]): string | nul
   return null;
 }
 
-export const PRESET_ORDER = ["read_only", "read_write", "terminal"] as const;
+export const PRESET_ORDER = ["read_only", "read_write", "terminal", "sudo_for_all"] as const;
+export const SUDO_PRESET = "sudo_for_all";
+/** Duração máxima (segundos) de um grant sudo-for-all. */
+export const SUDO_MAX_SECONDS = 24 * 3600;
 export type CeilingPreset = (typeof PRESET_ORDER)[number];
 export const presetRank = (p: string) => PRESET_ORDER.indexOf(p as CeilingPreset);
 
@@ -110,3 +119,28 @@ export function checkCeiling(
   const over = toolsForPreset(want.preset as Preset).filter((t) => !cap.includes(t));
   return over.length ? `Este preset inclui tools proibidas para a tua conta: ${over.join(", ")}.` : null;
 }
+
+/** Verificação lexical (servidor): bloqueio vence; depois `allowAllDirs` ou `allowedDirs`. */
+export function pathAllowed(
+  perms: Pick<EffectivePermissions, "allowedDirs" | "blockedDirs" | "allowAllDirs">,
+  path: string,
+): { ok: true } | { ok: false; reason: "blocked" | "outside" } {
+  if (perms.blockedDirs.some((d) => isWithin(d, path))) return { ok: false, reason: "blocked" };
+  if (perms.allowAllDirs || perms.allowedDirs.some((d) => isWithin(d, path))) return { ok: true };
+  return { ok: false, reason: "outside" };
+}
+
+/** "0.3.1" >= "0.3.0"; versões ausentes ou inválidas contam como antigas. */
+export function versionAtLeast(v: string | null | undefined, min: string): boolean {
+  const p = (s: string) => s.split(".").map((n) => parseInt(n, 10));
+  const a = v ? p(v) : null;
+  if (!a || a.some(Number.isNaN)) return false;
+  const b = p(min);
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
+  }
+  return true;
+}
+
+/** Versão mínima do relay que impõe `blockedDirs` (relays antigos ignoravam o campo). */
+export const MIN_RELAY_BLOCKED_DIRS = "0.3.0";
