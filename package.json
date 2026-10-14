@@ -1,0 +1,12 @@
+{
+  "name": "mortality",
+  "private": true,
+  "packageManager": "pnpm@10.29.3",
+  "scripts": {
+    "dev": "pnpm --filter @mortality/web dev",
+    "build": "pnpm --filter @mortality/web build",
+    "db:generate": "pnpm --filter @mortality/web db:generate",
+    "db:migrate": "pnpm --filter @mortality/web db:migrate",
+    "test": "pnpm --filter @mortality/web test"
+  }
+}

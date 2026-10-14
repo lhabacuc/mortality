@@ -1,0 +1,1 @@
+ALTER TABLE "devices" ADD COLUMN "paused_locally" boolean DEFAULT false NOT NULL;
