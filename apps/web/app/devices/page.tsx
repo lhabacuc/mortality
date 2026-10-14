@@ -3,6 +3,7 @@ import { ONLINE_THRESHOLD_MS } from "@mortality/shared";
 import { db, schema } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
 import { deviceAction } from "@/lib/panel-actions";
+import { appUrl } from "@/lib/app-url";
 
 export default async function Devices() {
   const user = await requireUser();
@@ -18,7 +19,7 @@ export default async function Devices() {
   return (
     <main>
       <h1>Dispositivos</h1>
-      <p>Para adicionar: instala a CLI e corre <code>mortality install --server {process.env.APP_URL ?? "https://…"}</code>, depois confirma o código em <a href="/device">/device</a>.</p>
+      <p>Para adicionar: instala a CLI e corre <code>mortality install --server {appUrl()}</code>, depois confirma o código em <a href="/device">/device</a>.</p>
       <table width="100%">
         <thead><tr><th align="left">Nome</th><th>SO</th><th>Estado</th><th>Relay</th><th /></tr></thead>
         <tbody>

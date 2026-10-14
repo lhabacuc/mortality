@@ -5,6 +5,7 @@ import { and, count, eq, isNull, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { ALL_TOOLS } from "@mortality/shared";
+import { appUrl } from "./app-url";
 import { audit } from "./audit";
 import { db, schema } from "./db";
 import { requireAdmin } from "./guard";
@@ -106,7 +107,7 @@ export async function createInvite(_: PanelState, form: FormData): Promise<Panel
   });
   await audit({ actor: "admin", action: "admin.invite.create", argsSummary: `${p.data.email || "qualquer email"} by ${admin.email}` });
   revalidatePath("/admin/invites");
-  const base = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const base = appUrl();
   return { token: `${base}/signup?invite=${raw}` };
 }
 

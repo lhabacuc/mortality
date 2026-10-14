@@ -1,0 +1,8 @@
+.env
+.env.*
+**/.env
+.playwright-mcp
+.git
+**/.next
+**/node_modules
+packages/cli/dist

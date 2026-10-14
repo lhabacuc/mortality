@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/guard";
 import { canonicalResource } from "@/lib/oauth";
+import { appUrl } from "@/lib/app-url";
 
 const Code = ({ children }: { children: string }) => (
   <pre style={{ background: "#f4f4f4", padding: 10, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{children}</pre>
@@ -8,7 +9,7 @@ const Code = ({ children }: { children: string }) => (
 /** Formatos verificados na documentação de cada cliente em 2026-10-14 (ver README: testado vs esperado). */
 export default async function Connect() {
   await requireUser();
-  const base = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const base = appUrl();
   const url = canonicalResource(base);
   const PAT = "<O_TEU_TOKEN_mpat_…>";
   return (

@@ -1,3 +1,5 @@
+import { appUrl } from "./app-url";
+
 const BASE: Record<string, string> = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
@@ -19,4 +21,4 @@ export function jsonCors(body: unknown, status = 200, extra?: HeadersInit): Resp
   return withCors(Response.json(body, { status, headers: { "cache-control": "no-store", pragma: "no-cache", ...extra } }));
 }
 
-export const baseUrl = (req: Request) => (process.env.APP_URL ?? new URL(req.url).origin).replace(/\/$/, "");
+export const baseUrl = (req: Request) => appUrl(new URL(req.url).origin);

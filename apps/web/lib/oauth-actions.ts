@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { checkCeiling } from "@mortality/shared";
+import { appUrl } from "./app-url";
 import { audit } from "./audit";
 import { db, schema } from "./db";
 import { requireUser } from "./guard";
@@ -17,9 +18,8 @@ const DURATIONS: Record<string, number | null> = { "1h": 3600, "24h": 86400, "30
 const KEYS = ["client_id", "redirect_uri", "response_type", "code_challenge", "code_challenge_method", "state", "scope", "resource"];
 
 async function issuer() {
-  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
   const h = await headers();
-  return `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
+  return appUrl(`${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`);
 }
 
 export async function decideConsent(form: FormData) {

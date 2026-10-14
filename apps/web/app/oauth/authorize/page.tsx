@@ -5,6 +5,7 @@ import { decideConsent } from "@/lib/oauth-actions";
 import { db, schema } from "@/lib/db";
 import { currentUser } from "@/lib/session";
 import { validateAuthRequest, redirectWith } from "@/lib/oauth-request";
+import { appUrl } from "@/lib/app-url";
 
 type SP = Record<string, string | string[] | undefined>;
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
@@ -14,7 +15,7 @@ export default async function Authorize({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   if (first(sp.error)) return <Fatal message={first(sp.error)!} />;
 
-  const base = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const base = appUrl();
   const req = await validateAuthRequest((k) => first(sp[k]), base);
   if (req.kind === "fatal") return <Fatal message={req.message} />;
   if (req.kind === "redirect_error") redirect(redirectWith(req.redirectUri, { error: req.error, state: req.state }, base));

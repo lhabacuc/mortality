@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { allow, clientIp } from "@/lib/ratelimit";
 import { json } from "@/lib/relay-auth";
 import { newSecret, newUserCode, sha256 } from "@/lib/tokens";
+import { appUrl } from "@/lib/app-url";
 
 const Body = z.object({
   device_name: z.string().trim().min(1).max(60).regex(/^[\w .-]+$/),
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     deviceName: body.data.device_name, os: body.data.os ?? null,
     expiresAt: new Date(Date.now() + expiresIn * 1000),
   });
-  const base = process.env.APP_URL ?? new URL(req.url).origin;
+  const base = appUrl(new URL(req.url).origin);
   return json({
     device_code: deviceCode, user_code: userCode,
     verification_uri: `${base}/device`,
