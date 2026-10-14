@@ -58,5 +58,16 @@ curl -fsSL <URL>/install | bash        # instala a CLI e oferece emparelhar; apr
 4. Num chat com o conector ativo: *"lista os ficheiros de <diretório> no dispositivo X"*.
 5. Para o teste de escrita: preset **Leitura e escrita**; para terminal: aprova no painel (`/approvals`).
 
+## Se o deploy ficar `BLOCKED`
+Com um remote git configurado, a CLI anexa o autor do commit; em equipas Hobby a Vercel bloqueia se esse email não for
+membro da equipa («commit author doesn't have permission»). O estado fica `UNKNOWN` sem logs. Soluções:
+- adicionar o email do autor à equipa Vercel, ou ligar a conta GitHub à Vercel; ou
+- fazer o deploy a partir de uma exportação sem metadados git:
+```bash
+T=$(mktemp -d) && git archive HEAD | tar -x -C $T && mkdir -p $T/.vercel && cp .vercel/project.json $T/.vercel/
+(cd $T && vercel deploy --prod --scope 42skillars-projects --yes)
+```
+Diagnóstico: `vercel api /v13/deployments/<id>` → `readyStateReason`.
+
 ## Reverter
 `vercel rollback`, ou `vercel project remove <PROJETO>`; no relay `mortality uninstall`.
