@@ -1,7 +1,7 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
-import { addGrant, disconnectAll, revokeGrant, updateGrant } from "@/lib/access-actions";
+import { addGrant, disconnectAll, revokeGrant, revokeOAuthClient, updateGrant } from "@/lib/access-actions";
 import { PanelForm } from "../panel-form";
 import { GrantFields } from "../grant-fields";
 
@@ -19,6 +19,27 @@ export default async function Clients() {
     db().select().from(schema.clientGrants).where(and(
       eq(schema.clientGrants.userId, user.id), isNull(schema.clientGrants.revokedAt))),
   ]);
+  const patIds = new Set(tokens.filter((t) => t.kind === "pat").map((t) => t.id));
+  const oauthIds = [...new Set(grants.map((g) => g.clientId).filter((c) => !patIds.has(c)))];
+  const oauthNames = oauthIds.length
+    ? await db().select({ id: schema.oauthClients.clientId, name: schema.oauthClients.name }).from(schema.oauthClients)
+        .where(inArray(schema.oauthClients.clientId, oauthIds))
+    : [];
+  const oauthLast = oauthIds.length
+    ? await db().select({ id: schema.accessTokens.clientId, at: schema.accessTokens.lastUsedAt }).from(schema.accessTokens)
+        .where(and(eq(schema.accessTokens.userId, user.id), inArray(schema.accessTokens.clientId, oauthIds)))
+    : [];
+  const entries = [
+    ...tokens.filter((t) => t.kind === "pat").map((t) => ({
+      key: t.id, title: t.name ?? "(sem nome)", kind: "pat", last: t.lastUsedAt,
+      note: t.expiresAt ? `expira ${when(t.expiresAt)}` : "sem expiração",
+    })),
+    ...oauthIds.map((id) => ({
+      key: id, title: oauthNames.find((n) => n.id === id)?.name ?? id, kind: "oauth",
+      last: oauthLast.filter((l) => l.id === id).map((l) => l.at).filter((a): a is Date => !!a).sort((a, b) => b.getTime() - a.getTime())[0] ?? null,
+      note: "OAuth",
+    })),
+  ];
   const now = Date.now();
   const devName = new Map(devices.map((d) => [d.id, d.name]));
 
@@ -28,14 +49,17 @@ export default async function Clients() {
       <p>Cada cliente só acede aos dispositivos para os quais tem um grant ativo. Sem grant, o acesso é negado.</p>
       <form action={disconnectAll}><button>Desconectar tudo</button></form>
 
-      {tokens.length === 0 && <p>Nenhum cliente. Cria um token em <a href="/tokens">Tokens</a>.</p>}
-      {tokens.map((t) => {
-        const own = grants.filter((g) => g.clientId === (t.clientId ?? t.id));
+      {entries.length === 0 && <p>Nenhum cliente. Cria um token em <a href="/tokens">Tokens</a>.</p>}
+      {entries.map((t) => {
+        const own = grants.filter((g) => g.clientId === t.key);
         const free = devices.filter((d) => !own.some((g) => g.deviceId === d.id));
         return (
-          <section key={t.id} style={{ border: "1px solid #888", padding: 12, margin: "16px 0" }}>
-            <h2 style={{ marginTop: 0 }}>{t.name ?? "(sem nome)"} <small>({t.kind})</small></h2>
-            <p>Último uso: {when(t.lastUsedAt, "nunca")} · Token {t.expiresAt ? `expira ${when(t.expiresAt)}` : "sem expiração"}</p>
+          <section key={t.key} style={{ border: "1px solid #888", padding: 12, margin: "16px 0" }}>
+            <h2 style={{ marginTop: 0 }}>{t.title} <small>({t.kind})</small></h2>
+            <p>Último uso: {when(t.last, "nunca")} · {t.note}</p>
+            {t.kind === "oauth" && (
+              <form action={revokeOAuthClient}><input type="hidden" name="clientId" value={t.key} /><button>Revogar cliente (tokens e acessos)</button></form>
+            )}
             {own.length === 0 && <p><em>Sem acesso a nenhum dispositivo.</em></p>}
             {own.map((g) => {
               const expired = g.expiresAt && g.expiresAt.getTime() < now;
@@ -62,7 +86,7 @@ export default async function Clients() {
               <details>
                 <summary>Dar acesso a outro dispositivo</summary>
                 <PanelForm action={addGrant} submit="Conceder acesso">
-                  <input type="hidden" name="clientId" value={t.id} />
+                  <input type="hidden" name="clientId" value={t.key} />
                   <select name="deviceId" required>{free.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
                   <GrantFields />
                 </PanelForm>

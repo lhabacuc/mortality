@@ -15,6 +15,13 @@
       "when": 1791986928386,
       "tag": "0001_spotty_psylocke",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791988661610,
+      "tag": "0002_optimal_norrin_radd",
+      "breakpoints": true
     }
   ]
 }

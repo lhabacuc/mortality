@@ -2,6 +2,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { commandBlocked, isWithin } from "@mortality/shared";
 import { audit } from "@/lib/audit";
+import { baseUrl, preflight, withCors } from "@/lib/cors";
+import { canonicalResource } from "@/lib/oauth";
+import { bearer } from "@/lib/tokens";
 import { clientIp, allow } from "@/lib/ratelimit";
 import { JobError, runJob } from "@/lib/jobs";
 import { AccessError, activeGrants, authenticateMcp, resolveDevice, type McpContext } from "@/lib/mcp-access";
@@ -79,26 +82,28 @@ async function buildServer(ctx: McpContext, ip: string) {
 }
 
 export async function POST(req: Request) {
-  const ctx = await authenticateMcp(req);
+  const base = baseUrl(req);
+  const ctx = await authenticateMcp(req, canonicalResource(base));
   if (!ctx) {
-    const base = process.env.APP_URL ?? new URL(req.url).origin;
-    return new Response(JSON.stringify({ error: "unauthorized" }), {
+    const invalid = bearer(req) ? `error="invalid_token", ` : "";
+    return withCors(new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: {
         "content-type": "application/json",
-        "www-authenticate": `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`,
+        "www-authenticate": `Bearer ${invalid}resource_metadata="${base}/.well-known/oauth-protected-resource"`,
       },
-    });
+    }));
   }
   const ip = clientIp(req);
-  if (!(await allow(`mcp:${ctx.tokenId}`, 120, 60))) return new Response("rate limited", { status: 429 });
+  if (!(await allow(`mcp:${ctx.tokenId}`, 120, 60))) return withCors(new Response("rate limited", { status: 429 }));
 
   const server = await buildServer(ctx, ip);
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);
-  return transport.handleRequest(req);
+  return withCors(await transport.handleRequest(req));
 }
 
-const notAllowed = () => new Response("Method not allowed", { status: 405, headers: { allow: "POST" } });
+const notAllowed = () => withCors(new Response("Method not allowed", { status: 405, headers: { allow: "POST" } }));
 export const GET = notAllowed;
 export const DELETE = notAllowed;
+export const OPTIONS = preflight;

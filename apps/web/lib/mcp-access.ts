@@ -14,7 +14,7 @@ export interface McpContext {
 
 export class AccessError extends Error {}
 
-export async function authenticateMcp(req: Request): Promise<McpContext | null> {
+export async function authenticateMcp(req: Request, resource?: string): Promise<McpContext | null> {
   const raw = bearer(req);
   if (!raw) return null;
   const now = new Date();
@@ -27,6 +27,8 @@ export async function authenticateMcp(req: Request): Promise<McpContext | null> 
       or(isNull(schema.accessTokens.expiresAt), gt(schema.accessTokens.expiresAt, now)),
     )).limit(1);
   if (!row || row.u.status !== "active" || row.u.mustChangePassword) return null;
+  // Token OAuth é ligado ao resource (RFC 8707): não vale para outro servidor.
+  if (row.t.kind === "oauth" && resource && row.t.resource?.replace(/\/$/, "") !== resource) return null;
   await db().update(schema.accessTokens).set({ lastUsedAt: now }).where(eq(schema.accessTokens.id, row.t.id));
   return {
     userId: row.u.id, userEmail: row.u.email, tokenId: row.t.id,

@@ -72,6 +72,7 @@ export const accessTokens = pgTable("access_tokens", {
   name: text("name"),
   scope: text("scope").notNull(),
   resource: text("resource"),
+  familyId: uuid("family_id"),
   expiresAt: ts("expires_at"),
   revokedAt: ts("revoked_at"),
   lastUsedAt: ts("last_used_at"),

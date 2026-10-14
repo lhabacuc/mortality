@@ -8,6 +8,7 @@ import { audit } from "./audit";
 import { db, schema } from "./db";
 import { requireUser } from "./guard";
 import type { PanelState } from "./panel-actions";
+import { revokeClientForUser } from "./oauth-tokens";
 
 const DURATIONS: Record<string, number | null> = { "1h": 3600, "24h": 86400, "30d": 2592000, never: null };
 const lines = (v: FormDataEntryValue | null) =>
@@ -61,13 +62,21 @@ export async function updateGrant(_: PanelState, form: FormData): Promise<PanelS
 
 export async function addGrant(_: PanelState, form: FormData): Promise<PanelState> {
   const user = await requireUser();
-  const ids = z.object({ clientId: z.string().uuid(), deviceId: z.string().uuid() }).safeParse(Object.fromEntries(form));
+  const ids = z.object({ clientId: z.string().min(1).max(100), deviceId: z.string().uuid() }).safeParse(Object.fromEntries(form));
   if (!ids.success) return { error: "Dados inválidos." };
   const g = parseGrant(form);
   if ("error" in g) return { error: g.error };
 
-  const [tok] = await db().select({ id: schema.accessTokens.id }).from(schema.accessTokens)
-    .where(and(eq(schema.accessTokens.id, ids.data.clientId), eq(schema.accessTokens.userId, user.id), isNull(schema.accessTokens.revokedAt))).limit(1);
+  // O cliente tem de ser um PAT do utilizador ou um cliente OAuth ao qual ele já deu acesso.
+  const isUuid = z.string().uuid().safeParse(ids.data.clientId).success;
+  const [pat] = isUuid
+    ? await db().select({ id: schema.accessTokens.id }).from(schema.accessTokens).where(and(
+        eq(schema.accessTokens.id, ids.data.clientId), eq(schema.accessTokens.userId, user.id),
+        eq(schema.accessTokens.kind, "pat"), isNull(schema.accessTokens.revokedAt))).limit(1)
+    : [];
+  const [known] = pat ? [pat] : await db().select({ id: schema.clientGrants.id }).from(schema.clientGrants).where(and(
+    eq(schema.clientGrants.userId, user.id), eq(schema.clientGrants.clientId, ids.data.clientId))).limit(1);
+  const tok = known ? { id: ids.data.clientId } : undefined;
   const [dev] = await db().select({ id: schema.devices.id }).from(schema.devices)
     .where(and(eq(schema.devices.id, ids.data.deviceId), eq(schema.devices.userId, user.id), isNull(schema.devices.revokedAt))).limit(1);
   if (!tok || !dev) return { error: "Cliente ou dispositivo inválido." };
@@ -108,4 +117,12 @@ export async function disconnectAll() {
   revalidatePath("/clients");
   revalidatePath("/activity");
   revalidatePath("/tokens");
+}
+
+export async function revokeOAuthClient(form: FormData) {
+  const user = await requireUser();
+  const clientId = z.string().min(1).max(100).parse(form.get("clientId"));
+  await revokeClientForUser(user.id, clientId);
+  await audit({ userId: user.id, clientId, actor: "user", action: "oauth_client.revoke" });
+  revalidatePath("/clients");
 }

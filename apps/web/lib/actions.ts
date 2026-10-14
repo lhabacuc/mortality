@@ -9,6 +9,7 @@ import { db, schema } from "./db";
 import { hashPassword, verifyPassword } from "./password";
 import { currentUser, endSession, startSession } from "./session";
 import { ensureAdmin } from "./bootstrap";
+import { safeNext } from "./oauth";
 
 const Email = z.string().trim().toLowerCase().email().max(254);
 const Pass = z.string().min(10, "mínimo 10 caracteres").max(200);
@@ -50,7 +51,7 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   if (user.status === "pending") return { error: "Conta a aguardar aprovação do administrador." };
 
   await startSession(user.id);
-  redirect(user.mustChangePassword ? "/change-password" : "/dashboard");
+  redirect(user.mustChangePassword ? "/change-password" : (safeNext(form.get("next") as string | null) ?? "/dashboard"));
 }
 
 export async function logout() {
