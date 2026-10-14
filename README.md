@@ -1,4 +1,8 @@
-# Mortality
+<p align="center">
+  <img src="assets/logo/mortality-logo-1000.png" alt="Mortality" width="520">
+</p>
+
+<p align="center"><strong>Acesso remoto controlado e revogável para clientes de IA, via MCP.</strong></p>
 
 Painel web + relay para dar a clientes de IA (Claude, ChatGPT, Gemini, Cursor, VS Code…) acesso **controlado e revogável**
 às tuas máquinas, via [MCP](https://modelcontextprotocol.io). Open source, deploy em **Vercel + Neon**.
