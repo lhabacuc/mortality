@@ -13,5 +13,6 @@ export async function requireUser() {
 export async function requireAdmin() {
   const u = await requireUser();
   if (u.role !== "admin") redirect("/dashboard");
+  if (process.env.REQUIRE_ADMIN_TOTP === "1" && !u.totpEnabled) redirect("/security");
   return u;
 }

@@ -1,6 +1,6 @@
 {
   "name": "mortality",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Relay local do Mortality (systemd --user). Não executa comandos de clientes locais.",
   "type": "module",
   "bin": { "mortality": "dist/index.js" },

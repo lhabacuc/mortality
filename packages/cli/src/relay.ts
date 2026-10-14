@@ -1,15 +1,20 @@
+import { appendFileSync } from "node:fs";
 import { arch, platform } from "node:os";
 import { VERSION, isPaused, loadDevice } from "./config.ts";
 import { loadPolicy } from "./policy.ts";
-import { ctl } from "./service.ts";
-import { SERVICE } from "./config.ts";
+import { backend, logFile } from "./service.ts";
 import { tools } from "./tools/index.ts";
 import { killAllSessions } from "./tools/process.ts";
 
 interface Job { id: string; clientId: string; tool: string; args: Record<string, unknown>; permissions: { allowedDirs: string[]; blockedCommands: string[]; readOnly: boolean } }
 
 const sleep = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
-const log = (m: string) => console.log(`[${new Date().toISOString()}] ${m}`); // nunca regista tokens nem conteúdo
+// Nunca regista tokens nem conteúdo. Em Windows (sem journald) também grava em ficheiro.
+const log = (m: string) => {
+  const line = `[${new Date().toISOString()}] ${m}`;
+  console.log(line);
+  if (process.platform === "win32") { try { appendFileSync(logFile(), line + "\n"); } catch { /* sem log */ } }
+};
 
 class Revoked extends Error {}
 
@@ -72,7 +77,7 @@ export async function runRelay(opts: { service: boolean }) {
     } catch (e) {
       if (e instanceof Revoked) {
         log("dispositivo revogado ou token inválido — a parar o serviço.");
-        if (opts.service) ctl("disable", "--now", SERVICE);
+        if (opts.service) backend().stop();
         process.exit(0);
       }
       failures++;

@@ -5,11 +5,11 @@ import { createInterface } from "node:readline/promises";
 import { arch, hostname, platform } from "node:os";
 import { fileURLToPath } from "node:url";
 import {
-  SERVICE, VERSION, configDir, isPaused, loadDevice, policyPath, saveDevice, setPaused,
+  VERSION, configDir, isPaused, loadDevice, policyPath, saveDevice, setPaused,
 } from "./config.ts";
 import { defaultPolicy, loadPolicy, savePolicy } from "./policy.ts";
 import { runRelay } from "./relay.ts";
-import { ctl, generateUnit, lingerEnabled, removeUnit, writeUnit } from "./service.ts";
+import { backend, lingerEnabled } from "./service.ts";
 import { existsSync } from "node:fs";
 
 const HELP = `mortality ${VERSION} — relay local (sem acesso a ferramentas; tudo é controlado no painel web)
@@ -74,14 +74,13 @@ async function install(args: string[]) {
   if (dir) savePolicy(defaultPolicy(dir));
 
   const script = realpathSync(fileURLToPath(import.meta.url));
-  const { backup } = writeUnit(generateUnit(process.execPath, script));
-  if (backup) console.log(`Unit anterior guardada em ${backup}`);
-  ctl("daemon-reload");
-  const en = ctl("enable", "--now", SERVICE);
-  if (!en.ok) die(`Não consegui iniciar o serviço: ${en.out}`);
+  const svc = backend();
+  const inst = svc.install(process.execPath, script);
+  if (inst.backup) console.log(`Configuração anterior guardada em ${inst.backup}`);
+  if (!inst.ok) die(`Não consegui iniciar o serviço (${svc.name}): ${inst.out}`);
 
   console.log(`\nDispositivo "${paired.device_name}" emparelhado.`);
-  console.log(`Serviço: ${ctl("is-active", SERVICE).out}   Painel: ${server}`);
+  console.log(`Serviço (${svc.name}): ${svc.isActive()}   Painel: ${server}`);
   if (lingerEnabled() === false) {
     console.log(`\nAviso: sem "linger" o relay só corre com sessão aberta.\nPara correr após reboot sem login:  loginctl enable-linger $USER  (pode exigir privilégios)`);
   }
@@ -92,7 +91,7 @@ async function status(json: boolean) {
   const cfg = loadDevice();
   const s = {
     paired: !!cfg, device: cfg?.device_name ?? null, server: cfg?.server ?? null,
-    service: ctl("is-active", SERVICE).out, paused: isPaused(), policy: loadPolicy(),
+    service: backend().isActive(), paused: isPaused(), policy: loadPolicy(),
   };
   if (json) return console.log(JSON.stringify(s, null, 2));
   console.log(`Dispositivo: ${s.device ?? "(não emparelhado)"}\nServidor:    ${s.server ?? "-"}\nServiço:     ${s.service}\nPausa local: ${s.paused ? "sim" : "não"}\nDiretórios:  ${s.policy.allowed_dirs.join(", ") || "(nenhum)"}\nSó leitura:  ${s.policy.read_only}`);
@@ -105,9 +104,7 @@ async function uninstall() {
       await fetch(`${cfg.server}/api/relay/revoke`, { method: "POST", headers: { authorization: `Bearer ${cfg.device_token}` } });
     } catch { console.error("Aviso: não consegui revogar no servidor; revoga o dispositivo no painel."); }
   }
-  ctl("disable", "--now", SERVICE);
-  removeUnit();
-  ctl("daemon-reload");
+  backend().uninstall();
   rmSync(configDir(), { recursive: true, force: true });
   console.log("Relay removido e configuração apagada.");
 }
@@ -116,10 +113,16 @@ const [cmd, ...rest] = process.argv.slice(2);
 switch (cmd) {
   case "install": await install(rest); break;
   case "status": await status(rest.includes("--json")); break;
-  case "logs": spawn("journalctl", ["--user", "-u", SERVICE, ...(rest.includes("-f") ? ["-f"] : ["-n", "100"])], { stdio: "inherit" }); break;
+  case "logs": {
+    const l = backend().logs(rest.includes("-f"));
+    if ("cmd" in l) spawn(l.cmd, l.args, { stdio: "inherit" });
+    else if (process.platform === "win32") spawn("powershell", ["-Command", `Get-Content -Path '${l.file}' -Tail 100${rest.includes("-f") ? " -Wait" : ""}`], { stdio: "inherit" });
+    else spawn("tail", [...(rest.includes("-f") ? ["-f"] : []), "-n", "100", l.file], { stdio: "inherit" });
+    break;
+  }
   case "pause": setPaused(true); console.log("Relay pausado localmente."); break;
   case "resume": setPaused(false); console.log("Relay retomado."); break;
-  case "restart": console.log(ctl("restart", SERVICE).ok ? "Reiniciado." : "Falhou."); break;
+  case "restart": console.log(backend().restart().ok ? "Reiniciado." : "Falhou."); break;
   case "policy":
     if (rest[0] === "show") console.log(readFileSync(policyPath(), "utf8"));
     else if (rest[0] === "edit") {

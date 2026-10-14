@@ -29,6 +29,13 @@
       "when": 1791989322324,
       "tag": "0003_wet_turbo",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791990060197,
+      "tag": "0004_nosy_black_queen",
+      "breakpoints": true
     }
   ]
 }

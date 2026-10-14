@@ -13,6 +13,7 @@ const OPS: Record<string, [string, string][]> = {
 export default async function Admin() {
   const me = await currentUser();
   if (!me || me.role !== "admin" || me.mustChangePassword) redirect("/login");
+  if (process.env.REQUIRE_ADMIN_TOTP === "1" && !me.totpEnabled) redirect("/security");
   const users = await db().select().from(schema.users).orderBy(desc(schema.users.createdAt));
   return (
     <main>

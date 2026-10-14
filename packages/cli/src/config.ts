@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 export const SERVICE = "mortality-relay";
 
 export const configDir = () => join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "mortality");

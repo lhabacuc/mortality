@@ -10,7 +10,7 @@ const cell = (v: unknown) => {
 
 export async function GET(req: Request) {
   const u = await currentUser();
-  if (!u || u.role !== "admin" || u.mustChangePassword || u.status !== "active") return new Response("forbidden", { status: 403 });
+  if (!u || u.role !== "admin" || u.mustChangePassword || u.status !== "active" || (process.env.REQUIRE_ADMIN_TOTP === "1" && !u.totpEnabled)) return new Response("forbidden", { status: 403 });
   const rows = await queryAudit(parseFilters(new URL(req.url).searchParams, 5000));
   const head = ["created_at", "user_email", "actor", "action", "tool", "device", "ok", "ip", "args_summary"];
   const lines = rows.map(({ a, email, device }) => [

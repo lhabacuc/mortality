@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, gt, isNull, ne } from "drizzle-orm";
+import { and, eq, gt, isNull, ne, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -8,7 +8,8 @@ import { z } from "zod";
 import { SignupMode } from "@mortality/shared";
 import { db, schema } from "./db";
 import { hashPassword, verifyPassword } from "./password";
-import { currentUser, endSession, startSession } from "./session";
+import { clearPending, currentUser, endSession, readPending, startPending, startSession } from "./session";
+import { decryptSecret, verifyTotp } from "./totp";
 import { ensureAdmin } from "./bootstrap";
 import { safeNext } from "./oauth";
 import { allow, ipFromHeaders } from "./ratelimit";
@@ -80,8 +81,52 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   if (user.status === "suspended") return { error: "Conta suspensa." };
   if (user.status === "pending") return { error: "Conta a aguardar aprovação do administrador." };
 
+  const next = safeNext(form.get("next") as string | null);
+  if (user.totpEnabled) {
+    await startPending(user.id);
+    redirect(next ? `/login/2fa?next=${encodeURIComponent(next)}` : "/login/2fa");
+  }
   await startSession(user.id);
-  redirect(user.mustChangePassword ? "/change-password" : (safeNext(form.get("next") as string | null) ?? "/dashboard"));
+  redirect(user.mustChangePassword ? "/change-password" : (next ?? "/dashboard"));
+}
+
+/** 2º passo do login: código TOTP ou recovery code (uso único). */
+export async function verify2fa(_: FormState, form: FormData): Promise<FormState> {
+  const userId = await readPending();
+  if (!userId) redirect("/login");
+  if (!(await allow(`2fa:${userId}`, 5, 300))) return { error: "Demasiadas tentativas. Tenta mais tarde." };
+  const [user] = await db().select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+  if (!user || user.status !== "active" || !user.totpEnabled || !user.totpSecretEnc) redirect("/login");
+
+  const code = String(form.get("code") ?? "").trim().toUpperCase();
+  let ok = false;
+  if (/^\d{6}$/.test(code)) {
+    const step = verifyTotp(decryptSecret(user.totpSecretEnc), code, Date.now(), user.totpLastStep);
+    if (step !== null) {
+      // Atómico: o mesmo código não pode ser usado duas vezes.
+      const upd = await db().update(schema.users).set({ totpLastStep: step })
+        .where(and(eq(schema.users.id, user.id), user.totpLastStep === null ? isNull(schema.users.totpLastStep) : eq(schema.users.totpLastStep, user.totpLastStep)))
+        .returning({ id: schema.users.id });
+      ok = upd.length > 0;
+    }
+  } else if (/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) {
+    const h = sha256(code);
+    if (user.totpRecovery.includes(h)) {
+      const left = user.totpRecovery.filter((x) => x !== h);
+      const upd = await db().update(schema.users).set({ totpRecovery: left })
+        .where(and(eq(schema.users.id, user.id), sql`${h} = any(${schema.users.totpRecovery})`)).returning({ id: schema.users.id });
+      ok = upd.length > 0;
+      if (ok) await audit({ userId: user.id, actor: "user", action: "totp.recovery_used" });
+    }
+  }
+  if (!ok) {
+    await audit({ userId: user.id, actor: "user", action: "totp.failed", ok: false, ip: ipFromHeaders(await headers()) });
+    return { error: "Código inválido." };
+  }
+  await clearPending();
+  await startSession(user.id);
+  const next = safeNext(form.get("next") as string | null);
+  redirect(user.mustChangePassword ? "/change-password" : (next ?? "/dashboard"));
 }
 
 export async function logout() {
@@ -112,6 +157,7 @@ const AdminOp = z.object({
 export async function adminUserAction(form: FormData) {
   const admin = await currentUser();
   if (!admin || admin.role !== "admin" || admin.mustChangePassword) redirect("/login");
+  if (process.env.REQUIRE_ADMIN_TOTP === "1" && !admin.totpEnabled) redirect("/security");
   const { userId, op } = AdminOp.parse(Object.fromEntries(form));
   if (userId === admin.id) return; // nunca atuar sobre si próprio (evita ficar sem admin)
 

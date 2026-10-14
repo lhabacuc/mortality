@@ -19,6 +19,11 @@ export const users = pgTable("users", {
   maxPreset: text("max_preset", { enum: ["read_only", "read_write", "terminal"] }).notNull().default("terminal"),
   maxDevices: integer("max_devices").notNull().default(5),
   disabledTools: text("disabled_tools").array().notNull().default(sql`'{}'`),
+  // TOTP opcional (RFC 6238). Segredo cifrado (AES-256-GCM); recovery codes só como hash.
+  totpSecretEnc: text("totp_secret_enc"),
+  totpEnabled: boolean("totp_enabled").notNull().default(false),
+  totpLastStep: integer("totp_last_step"),
+  totpRecovery: text("totp_recovery").array().notNull().default(sql`'{}'`),
   createdAt: createdAt(),
   approvedBy: uuid("approved_by"),
   approvedAt: ts("approved_at"),
