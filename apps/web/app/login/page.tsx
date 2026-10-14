@@ -13,7 +13,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
         <input name="email" type="email" placeholder="Email" required autoComplete="email" />
         <input name="password" type="password" placeholder="Password" required autoComplete="current-password" />
       </Form>
-      <p><Link href="/signup">Criar conta</Link></p>
+      <p><Link href="/signup">Criar conta</Link> · <Link href="/guide">Guia</Link></p>
     </main>
   );
 }

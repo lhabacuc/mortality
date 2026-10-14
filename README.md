@@ -23,6 +23,12 @@ Painel web + relay para dar a clientes de IA (Claude, ChatGPT, Gemini, Cursor, V
 - Permissões efetivas = **interseção** (grant do servidor ∩ política local `~/.config/mortality/policy.json`); o servidor nunca alarga a política local.
 - Tokens guardados só como hash SHA-256; segredos TOTP cifrados (AES-256-GCM); audit log sem conteúdo de ficheiros.
 
+## Guia dentro do painel
+
+O painel inclui uma aba **Guia** (`/guide`, pública) com: como funciona, instalação do relay, tabela de comandos da CLI,
+ligação de clientes, permissões, aprovações, como revogar e resolução de problemas. A barra de abas dá acesso rápido às
+secções (Dispositivos, Tokens, Clientes, Aprovações, Atividade, Ligar, Guia, Segurança).
+
 ## Arranque local
 
 ```bash
@@ -41,14 +47,16 @@ node packages/cli/dist/index.js install --server http://localhost:3000
 
 ## Deploy (Vercel + Neon)
 
-> **Não testado num deploy real** — a configuração segue a documentação de 2026-10-14.
+> **Testado em 2026-10-14** num deploy real (Vercel Hobby + Neon Free). O passo a passo com comandos está em [`DEPLOY.md`](DEPLOY.md).
 
 1. Cria um projeto Neon e copia a connection string **pooled**.
 2. Importa o repositório na Vercel com **Root Directory = `apps/web`** (ativa *Include source files outside of the Root Directory*, necessário para `packages/shared`).
 3. Define as variáveis de `.env.example` (no mínimo `DATABASE_URL`, `APP_URL`, `SESSION_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`).
    `APP_URL` tem de ser o URL **público e definitivo**: é o `issuer` e o `resource` OAuth.
-4. O `vercel.json` corre `pnpm db:migrate` antes do build (migrações idempotentes).
-5. Abre o painel, entra com o admin e troca a password. Depois remove `ADMIN_PASSWORD` das variáveis.
+4. O `vercel.json` corre `pnpm db:migrate` antes do build (migrações idempotentes). **Define `DATABASE_URL` antes do 1º deploy**, senão o build falha logo nessa etapa.
+5. `APP_URL` é opcional na Vercel: sem ele usa-se `VERCEL_PROJECT_PRODUCTION_URL` (domínio de produção, https).
+6. Abre o painel, entra com o admin e troca a password. Depois remove `ADMIN_PASSWORD` das variáveis.
+7. Para um serviço pessoal usa `SIGNUP_MODE=invite_only` e gera convites em *Administração → Convites*.
 
 **Planos (verificado na documentação em 2026-10-14):** Vercel Hobby é **só para uso não comercial**; inclui 1 000 000 invocações
 e 4 h de Active CPU por mês; `maxDuration` até 300 s. Neon Free: 100 CU-h/mês, autosuspend fixo de 5 min.
@@ -100,15 +108,28 @@ O painel (`/connect`) gera os snippets. Estado de compatibilidade:
 |---|---|---|
 | MCP Inspector (CLI, HTTP) | PAT | **testado** |
 | Cliente OAuth simulado (DCR + PKCE + refresh) | OAuth | **testado** (script + browser) |
+| **ChatGPT web** (Developer mode, conector personalizado) | OAuth | **testado em produção (2026-10-14)** — ver abaixo |
 | Claude.ai / Desktop (custom connector) | OAuth | esperado funcionar — *não testado contra o cliente real* |
 | Claude Code | OAuth / PAT | esperado funcionar — configuração verificada na doc |
-| ChatGPT (Developer mode) | OAuth | esperado funcionar — menus/planos variam; *não testado* |
 | Gemini CLI | OAuth / PAT | esperado funcionar — verificada na doc |
 | Cursor | OAuth / PAT | esperado funcionar — verificada na doc |
 | VS Code (Copilot) | PAT (`inputs`) / OAuth | esperado funcionar — verificada na doc |
 | Grok, Qwen, outros | PAT | depende de o cliente aceitar cabeçalhos num servidor MCP HTTP |
 
 Os clientes cloud (Claude.ai, ChatGPT) exigem um servidor **acessível pela internet pública** (HTTPS).
+
+### Resultado do teste com o ChatGPT web (2026-10-14)
+
+Fluxo real contra a Vercel + Neon, com um relay num PC Linux e o preset **só leitura**:
+
+1. O ChatGPT descobriu o servidor (`WWW-Authenticate` → *protected resource metadata* → *authorization server metadata*)
+   e **registou-se por DCR** sem client pré-registado.
+2. No ecrã de consentimento foi escolhido **1 dispositivo**, `read_only`, 1 diretório e 1 hora.
+3. O token OAuth foi emitido com `resource = <URL>/api/mcp`.
+4. `list_directory` e `read_file` executaram no relay e ficaram no audit log (sem conteúdo).
+
+**Ainda não validado com o ChatGPT:** presets de escrita/terminal, aprovações humanas, refresh do token após 1 h e planos
+diferentes do usado (o acesso a conectores personalizados depende do plano/workspace).
 
 ## Variáveis de ambiente
 
@@ -130,5 +151,5 @@ entre utilizadores e 2FA foram validados com scripts e browser contra Neon real 
 
 - **Login GitHub/Google** — precisa de credenciais OAuth tuas e de uma política de associação de contas; não foi
   implementado para não incluir código de autenticação sem o poder testar.
-- Notificação (push/email) de aprovações pendentes.
+- Notificação (push/email) de aprovações pendentes (o utilizador tem de ter o painel aberto; a janela de aprovação é de 30 s).
 - QR code no setup do TOTP (mostra a chave e o URI `otpauth://`).

@@ -23,6 +23,7 @@ export default async function Dashboard() {
         <li><Link href="/approvals">Aprovações pendentes{pending > 0 && ` (${pending})`}</Link></li>
         <li><Link href="/activity">Atividade</Link></li>
         <li><Link href="/connect">Ligar clientes MCP</Link></li>
+        <li><Link href="/guide">Guia: como usar, instalar e comandos</Link></li>
         <li><Link href="/security">Segurança (2FA){!user.totpEnabled && " — desativado"}</Link></li>
       </ul>
       {user.role === "admin" && <p><Link href="/admin">Administração</Link></p>}
